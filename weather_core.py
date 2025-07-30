@@ -45,13 +45,13 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
             })
         df = pd.DataFrame(records)
         df = df[["date", "t_max", "t_min", "t_avg", "precip", "solar_rad"]]
-        if unit.upper() == "C":
-            df["t_max"] = df["t_max"] - 273.15
-            df["t_min"] = df["t_min"] - 273.15
-            df["t_avg"] = df["t_avg"] - 273.15
+        if unit.upper() == "K":
+            df["t_max"] = df["t_max"] + 273.15
+            df["t_min"] = df["t_min"] + 273.15
+            df["t_avg"] = df["t_avg"] + 273.15
             df["unit"] = "°C"
         else:
-            df["unit"] = "K"
+            df["unit"] = "C"
         return df
     except Exception as e:
         print(f"NASA POWER 错误: {e}")
@@ -97,7 +97,10 @@ def get_weather_data(lat, lon, start_date, end_date, unit="C"):
         get_weather_open_meteo,
     ]
     for api_func in apis:
-        df = api_func(lat, lon, start_date, end_date, unit)
+        if api_func == get_weather_nasa_power:
+            df = api_func(lat, lon, start_date, end_date, unit)
+        else:
+            df = api_func(lat, lon, start_date, end_date)
         if df is not None and not df.empty:
             print(f"✅ 成功使用 {api_func.__name__} 数据源")
             return df
