@@ -33,7 +33,9 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         t_max = data["properties"]["parameter"].get("T2M_MAX", {})
         t_min = data["properties"]["parameter"].get("T2M_MIN", {})
 
-        if unit.upper() == "C":
+        if unit.upper() == "K":
+            pass  # 保留原始数据为开尔文
+        else:
             for date in t_avg:
                 if date in t_avg:
                     t_avg[date] -= 273.15
