@@ -93,15 +93,16 @@ def get_weather_open_meteo(lat, lon, start_date, end_date):
         return None
 
 # -------------------- 自动切换 API --------------------
-def get_weather_data(lat, lon, start_date, end_date):
+def get_weather_data(lat, lon, start_date, end_date, unit="C"):
     apis = [
         get_weather_nasa_power,
         get_weather_open_meteo,
     ]
     for api_func in apis:
-        df = api_func(lat, lon, start_date, end_date)
+        df = api_func(lat, lon, start_date, end_date, unit)
         if df is not None and not df.empty:
             print(f"✅ 成功使用 {api_func.__name__} 数据源")
+            df["unit"] = "°C" if unit == "C" else "K"
             return df
     raise Exception("❌ 所有数据源都无法获取数据")
 
@@ -130,6 +131,7 @@ if __name__ == "__main__":
 
     try:
         df = get_weather_data(lat, lon, start_date, end_date)
+        df["unit"] = "°C" if "unit" not in df else df["unit"]
         print(df)
         output_file = f"weather_{start_date}_{end_date}_{lat}_{lon}.csv"
         df.to_csv(output_file, index=False)
@@ -154,7 +156,7 @@ def compare_prediction_with_real(real_df, pred_df, column):
         ax.plot(df_merge["date"], df_merge[f"{column}_real"], label="真实数据")
         ax.plot(df_merge["date"], df_merge[f"{column}_pred"], label="预测数据")
         ax.set_xlabel("日期")
-        ax.set_ylabel(column)
+        ax.set_ylabel(f"{column} ({real_df.get('unit', '°C').iloc[0]})")
         ax.set_title(f"真实 vs 预测: {column}")
         ax.legend()
 
