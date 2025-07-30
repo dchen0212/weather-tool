@@ -7,7 +7,7 @@ from datetime import datetime
 from dateutil import parser
 
 # -------------------- API 3: NASA POWER --------------------
-def get_weather_nasa_power(lat, lon, start_date, end_date):
+def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
     try:
         print("尝试使用 NASA POWER API...")
         start_fmt = start_date.replace("-", "")
@@ -32,6 +32,16 @@ def get_weather_nasa_power(lat, lon, start_date, end_date):
         t_avg = data["properties"]["parameter"].get("T2M", {})
         t_max = data["properties"]["parameter"].get("T2M_MAX", {})
         t_min = data["properties"]["parameter"].get("T2M_MIN", {})
+
+        if unit.upper() == "C":
+            for date in t_avg:
+                if date in t_avg:
+                    t_avg[date] -= 273.15
+                if date in t_max:
+                    t_max[date] -= 273.15
+                if date in t_min:
+                    t_min[date] -= 273.15
+
         records = []
         for date in t_avg:
             records.append({

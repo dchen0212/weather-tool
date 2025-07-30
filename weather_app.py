@@ -13,6 +13,9 @@ lon = st.number_input("经度 (Longitude)", value=-84.0, format="%.6f")
 start_date = st.date_input("起始日期", value=datetime(2015, 1, 1))
 end_date = st.date_input("结束日期", value=datetime(2015, 12, 31))
 
+unit = st.radio("温度单位", ["摄氏度 (°C)", "开尔文 (K)"])
+unit_code = "C" if "摄氏" in unit else "K"
+
 # 按钮触发
 if st.button("获取天气数据"):
     if start_date > end_date:
@@ -20,7 +23,7 @@ if st.button("获取天气数据"):
     else:
         with st.spinner("正在获取数据，请稍候..."):
             try:
-                df = get_weather_data(lat, lon, str(start_date), str(end_date))
+                df = get_weather_data(lat, lon, str(start_date), str(end_date), unit=unit_code)
                 if df is not None and not df.empty:
                     st.success("✅ 获取成功！")
                     st.dataframe(df)
