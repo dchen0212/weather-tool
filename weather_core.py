@@ -49,6 +49,9 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
             df["t_max"] = df["t_max"] - 273.15
             df["t_min"] = df["t_min"] - 273.15
             df["t_avg"] = df["t_avg"] - 273.15
+            df["unit"] = "°C"
+        else:
+            df["unit"] = "K"
         return df
     except Exception as e:
         print(f"NASA POWER 错误: {e}")
@@ -97,7 +100,6 @@ def get_weather_data(lat, lon, start_date, end_date, unit="C"):
         df = api_func(lat, lon, start_date, end_date, unit)
         if df is not None and not df.empty:
             print(f"✅ 成功使用 {api_func.__name__} 数据源")
-            df["unit"] = "°C" if unit == "C" else "K"
             return df
     raise Exception("❌ 所有数据源都无法获取数据")
 
