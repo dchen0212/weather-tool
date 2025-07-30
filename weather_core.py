@@ -33,15 +33,6 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         t_max = data["properties"]["parameter"].get("T2M_MAX", {})
         t_min = data["properties"]["parameter"].get("T2M_MIN", {})
 
-        if unit.upper() == "C":
-            for date in t_avg:
-                if date in t_avg:
-                    t_avg[date] -= 273.15
-                if date in t_max:
-                    t_max[date] -= 273.15
-                if date in t_min:
-                    t_min[date] -= 273.15
-
         records = []
         for date in t_avg:
             records.append({
@@ -54,6 +45,10 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
             })
         df = pd.DataFrame(records)
         df = df[["date", "t_max", "t_min", "t_avg", "precip", "solar_rad"]]
+        if unit.upper() == "C":
+            df["t_max"] = df["t_max"] - 273.15
+            df["t_min"] = df["t_min"] - 273.15
+            df["t_avg"] = df["t_avg"] - 273.15
         return df
     except Exception as e:
         print(f"NASA POWER 错误: {e}")
