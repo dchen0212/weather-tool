@@ -33,3 +33,35 @@ if st.button("获取天气数据"):
                     st.warning("⚠️ 没有获取到有效数据。")
             except Exception as e:
                 st.error(f"❌ 出错：{e}")
+
+
+# --- 预测数据对比分析 ---
+st.markdown("---")
+st.header("📊 预测数据对比分析")
+
+uploaded_file = st.file_uploader("📂 上传预测 CSV 文件（必须包含 date 和字段列）", type="csv")
+
+if uploaded_file:
+    df_pred = pd.read_csv(uploaded_file)
+    try:
+        # 预测数据中必须包含的字段
+        target_cols = [col for col in ["t_avg", "t_max", "t_min", "precip", "solar_rad"] if col in df_pred.columns]
+        if not target_cols:
+            st.warning("⚠️ 预测文件中没有识别到有效字段。")
+        else:
+            target_col = st.selectbox("请选择对比字段：", target_cols)
+
+            # 读取 session 中的真实数据
+            if "df" in locals():
+                df_real = df
+                from weather_core import compare_prediction_with_real
+                result = compare_prediction_with_real(df_real, df_pred, target_col)
+
+                st.write(f"**MAE**: {result['mae']:.3f}")
+                st.write(f"**RMSE**: {result['rmse']:.3f}")
+                st.write(f"**R²**: {result['r2']:.3f}")
+                st.pyplot(result["fig"])
+            else:
+                st.info("请先获取真实天气数据，然后再上传预测文件进行对比。")
+    except Exception as e:
+        st.error(f"❌ 对比出错：{e}")

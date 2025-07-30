@@ -1,3 +1,6 @@
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+import numpy as np
 import requests
 import pandas as pd
 from datetime import datetime
@@ -123,3 +126,35 @@ if __name__ == "__main__":
         print(f"✅ 数据已保存为 {output_file}")
     except Exception as e:
         print(f"❌ 出现错误：{e}")
+
+
+# -------------------- 预测与真实数据对比分析 --------------------
+def compare_prediction_with_real(real_df, pred_df, column):
+    try:
+        real_df["date"] = pd.to_datetime(real_df["date"])
+        pred_df["date"] = pd.to_datetime(pred_df["date"])
+        df_merge = pd.merge(real_df[["date", column]], pred_df[["date", column]], on="date", suffixes=("_real", "_pred"))
+
+        ae_series = np.abs(df_merge[f"{column}_real"] - df_merge[f"{column}_pred"])
+        mae = mean_absolute_error(df_merge[f"{column}_real"], df_merge[f"{column}_pred"])
+        rmse = mean_squared_error(df_merge[f"{column}_real"], df_merge[f"{column}_pred"], squared=False)
+        r2 = r2_score(df_merge[f"{column}_real"], df_merge[f"{column}_pred"])
+
+        fig, ax = plt.subplots()
+        ax.plot(df_merge["date"], df_merge[f"{column}_real"], label="真实数据")
+        ax.plot(df_merge["date"], df_merge[f"{column}_pred"], label="预测数据")
+        ax.set_xlabel("日期")
+        ax.set_ylabel(column)
+        ax.set_title(f"真实 vs 预测: {column}")
+        ax.legend()
+
+        return {
+            "ae_series": ae_series,
+            "mae": mae,
+            "rmse": rmse,
+            "r2": r2,
+            "fig": fig
+        }
+    except Exception as e:
+        print(f"对比分析出错: {e}")
+        return None
