@@ -62,31 +62,36 @@ if real_file and pred_file:
 
         # 按列名自动检测公共字段
         common_cols = [col for col in df_real.columns if col in df_pred.columns]
+        # 移除无意义字段如日期字段
+        common_cols = [col for col in common_cols if col.lower() != 'date']
         if not common_cols:
             st.error("❌ 未找到两个文件中共有的对比字段")
         else:
             target_col = st.selectbox("请选择对比字段：", common_cols)
-            y_true = df_real[target_col].reset_index(drop=True)
-            y_pred = df_pred[target_col].reset_index(drop=True)
+            if target_col.lower() == "date":
+                st.warning("⚠️ 字段 'date' 为时间字段，不进行误差计算与绘图。")
+            else:
+                y_true = df_real[target_col].reset_index(drop=True)
+                y_pred = df_pred[target_col].reset_index(drop=True)
 
-            from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-            import numpy as np
-            import matplotlib.pyplot as plt
+                from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+                import numpy as np
+                import matplotlib.pyplot as plt
 
-            mae = mean_absolute_error(y_true, y_pred)
-            rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-            r2 = r2_score(y_true, y_pred)
+                mae = mean_absolute_error(y_true, y_pred)
+                rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+                r2 = r2_score(y_true, y_pred)
 
-            st.write(f"**MAE**: {mae:.3f}")
-            st.write(f"**RMSE**: {rmse:.3f}")
-            st.write(f"**R²**: {r2:.3f}")
+                st.write(f"**MAE**: {mae:.3f}")
+                st.write(f"**RMSE**: {rmse:.3f}")
+                st.write(f"**R²**: {r2:.3f}")
 
-            # 折线图
-            fig, ax = plt.subplots(figsize=(10, 4))
-            ax.plot(y_true.index, y_true, label="真实值")
-            ax.plot(y_pred.index, y_pred, label="预测值", linestyle="--")
-            ax.set_title(f"{target_col} 对比折线图")
-            ax.legend()
-            st.pyplot(fig)
+                # 折线图
+                fig, ax = plt.subplots(figsize=(10, 4))
+                ax.plot(y_true.index, y_true, label="真实值")
+                ax.plot(y_pred.index, y_pred, label="预测值", linestyle="--")
+                ax.set_title(f"{target_col} 对比折线图")
+                ax.legend()
+                st.pyplot(fig)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
