@@ -89,6 +89,19 @@ if real_file and pred_file:
                 rmse = np.sqrt(mean_squared_error(y_true, y_pred))
                 r2 = r2_score(y_true, y_pred)
 
+                # 每7天计算 MAE 并绘图
+                weekly_mae = [mean_absolute_error(y_true[i:i+7], y_pred[i:i+7]) for i in range(0, len(y_true), 7)]
+                st.subheader("📈 每7天的 MAE")
+                st.write(pd.DataFrame({"Week": list(range(1, len(weekly_mae)+1)), "Weekly MAE": weekly_mae}))
+
+                fig3, ax3 = plt.subplots(figsize=(10, 4))
+                ax3.plot(weekly_mae, marker='o', label="Weekly MAE")
+                ax3.set_title(f"Weekly MAE for {target_col}")
+                ax3.set_xlabel("Week Index")
+                ax3.set_ylabel("MAE")
+                ax3.legend()
+                st.pyplot(fig3)
+
                 st.write(f"**MAE**: {mae:.3f}")
                 st.write(f"**RMSE**: {rmse:.3f}")
                 st.write(f"**R²**: {r2:.3f}")
