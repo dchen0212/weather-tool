@@ -193,3 +193,47 @@ if real_file and pred_file:
                 st.pyplot(fig5)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
+
+
+# --- 降水与光照数据对比分析 ---
+st.markdown("---")
+st.header("🌦️ 降水与光照数据对比分析")
+
+# 只有在 real_file 和 pred_file 都已上传时才进行分析
+if 'df_real' in locals() and 'df_pred' in locals():
+    # 自动检测降水和光照字段
+    compare_fields = ["precipitation", "radiation"]
+    existing_fields = [col for col in compare_fields if col in df_real.columns and col in df_pred.columns]
+
+    for field in existing_fields:
+        name_map = {"precipitation": "Precipitation", "radiation": "Solar Radiation"}
+        field_display_name = name_map.get(field, field)
+        st.subheader(f"📈 字段对比：{field_display_name}")
+
+        y_true = df_real[field].reset_index(drop=True)
+        y_pred = df_pred[field].reset_index(drop=True)
+
+        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        ae = np.abs(y_true - y_pred)
+        error = y_pred - y_true
+
+        mae = mean_absolute_error(y_true, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+        r2 = r2_score(y_true, y_pred)
+
+        st.write(f"**MAE**: {mae:.3f}")
+        st.write(f"**RMSE**: {rmse:.3f}")
+        st.write(f"**R²**: {r2:.3f}")
+
+        # AE & Error 图
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(ae, label="Absolute Error (AE)")
+        ax.plot(error, label="Error")
+        ax.set_title(f"{field} Error Line Chart")
+        ax.set_xlabel("Index")
+        ax.set_ylabel("Error Value")
+        ax.legend()
+        st.pyplot(fig)
