@@ -1,10 +1,5 @@
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import matplotlib.pyplot as plt
-import numpy as np
 import requests
 import pandas as pd
-from datetime import datetime
-from dateutil import parser
 
 # -------------------- API 3: NASA POWER --------------------
 def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
@@ -105,87 +100,3 @@ def get_weather_data(lat, lon, start_date, end_date, unit="C"):
             print(f"✅ 成功使用 {api_func.__name__} 数据源")
             return df
     raise Exception("❌ 所有数据源都无法获取数据")
-
-
-# -------------------- CLI 输入入口 --------------------
-if __name__ == "__main__":
-    import sys
-
-    print("📍 请输入所需参数：")
-    try:
-        lat = float(input("纬度（latitude）："))
-        lon = float(input("经度（longitude）："))
-    except ValueError:
-        print("❌ 经纬度必须是数字，请重新运行程序。")
-        sys.exit(1)
-
-    try:
-        start_date = input("起始日期（YYYY-MM-DD）：")
-        end_date = input("结束日期（YYYY-MM-DD）：")
-        # 检查日期格式
-        datetime.strptime(start_date, "%Y-%m-%d")
-        datetime.strptime(end_date, "%Y-%m-%d")
-    except ValueError:
-        print("❌ 日期格式错误，请使用 YYYY-MM-DD 格式。")
-        sys.exit(1)
-
-    try:
-        df = get_weather_data(lat, lon, start_date, end_date)
-        df["unit"] = "°C" if "unit" not in df else df["unit"]
-        print(df)
-        output_file = f"weather_{start_date}_{end_date}_{lat}_{lon}.csv"
-        df.to_csv(output_file, index=False)
-        print(f"✅ 数据已保存为 {output_file}")
-    except Exception as e:
-        print(f"❌ 出现错误：{e}")
-
-# -------------------- 新增函数: 根据 CSV 自动推断温度列 --------------------
-def infer_column_from_csv(df):
-    """自动判断 CSV 中存在的温度列名，可返回 t_avg / t_mean / temp / t_max / t_min"""
-    candidates = ["t_avg", "t_mean", "temperature", "temp", "t_max", "t_min"]
-    found = [col for col in candidates if col in df.columns]
-    if not found:
-        raise ValueError("CSV 文件中未找到可识别的温度列名（如 t_avg, t_max, t_min 等）。")
-    return found[0]  # 默认优先使用第一个匹配到的
-
-# -------------------- 预测与真实数据对比分析 --------------------
-def compare_prediction_with_real(real_df, pred_df, column=None):
-    if column is None:
-        column = infer_column_from_csv(real_df)
-    try:
-        real_df["date"] = pd.to_datetime(real_df["date"])
-        pred_df["date"] = pd.to_datetime(pred_df["date"])
-        df_merge = pd.merge(real_df[["date", column]], pred_df[["date", column]], on="date", suffixes=("_real", "_pred"))
-
-        ae_series = np.abs(df_merge[f"{column}_real"] - df_merge[f"{column}_pred"])
-        mae = mean_absolute_error(df_merge[f"{column}_real"], df_merge[f"{column}_pred"])
-        rmse = mean_squared_error(df_merge[f"{column}_real"], df_merge[f"{column}_pred"], squared=False)
-        r2 = r2_score(df_merge[f"{column}_real"], df_merge[f"{column}_pred"])
-
-        fig, ax = plt.subplots()
-        ax.plot(df_merge["date"], df_merge[f"{column}_real"], label="真实数据")
-        ax.plot(df_merge["date"], df_merge[f"{column}_pred"], label="预测数据")
-        ax.set_xlabel("日期")
-        ax.set_ylabel(f"{column} ({real_df.get('unit', '°C').iloc[0]})")
-        ax.set_title(f"真实 vs 预测: {column}")
-        ax.legend()
-
-        return {
-            "ae_series": ae_series,
-            "mae": mae,
-            "rmse": rmse,
-            "r2": r2,
-            "fig": fig
-        }
-    except Exception as e:
-        print(f"对比分析出错: {e}")
-        return None
-
-# 示例：读取预测文件时使用 chardet 自动检测编码
-# 假设有一个变量 uploaded_file 是上传的文件对象
-# 以下代码替换原来的 df_pred = pd.read_csv(uploaded_file)
-# import chardet
-# result = chardet.detect(uploaded_file.read())
-# uploaded_file.seek(0)
-# encoding = result["encoding"]
-# df_pred = pd.read_csv(uploaded_file, encoding=encoding)
