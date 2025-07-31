@@ -197,7 +197,6 @@ if real_file and pred_file:
 
 # --- 降水与光照数据对比分析 ---
 st.markdown("---")
-st.header("🌦️ 降水与光照数据对比分析")
 
 # 只有在 real_file 和 pred_file 都已上传时才进行分析
 if 'df_real' in locals() and 'df_pred' in locals():
