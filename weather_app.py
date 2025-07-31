@@ -95,10 +95,11 @@ if real_file and pred_file:
 
                 ae = np.abs(y_true - y_pred)
                 error = y_pred - y_true
-                st.write(f"**AE (绝对误差)**（前10个）:")
-                st.dataframe(ae.head(10))
-                st.write(f"**Error (误差)**（前10个）:")
-                st.dataframe(error.head(10))
+                with st.expander("查看前10个绝对误差 (AE)"):
+                    st.dataframe(ae.head(10))
+
+                with st.expander("查看前10个误差 (Error)"):
+                    st.dataframe(error.head(10))
 
                 # 折线图
                 fig, ax = plt.subplots(figsize=(10, 4))
