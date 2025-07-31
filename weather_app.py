@@ -92,6 +92,15 @@ if real_file and pred_file:
                 # 每7天计算 MAE 并绘图
                 weekly_mae = [mean_absolute_error(y_true[i:i+7], y_pred[i:i+7]) for i in range(0, len(y_true), 7)]
                 weekly_rmse = [np.sqrt(mean_squared_error(y_true[i:i+7], y_pred[i:i+7])) for i in range(0, len(y_true), 7)]
+                # 计算每周 R²
+                weekly_r2 = []
+                for i in range(0, len(y_true), 7):
+                    y_t = y_true[i:i+7]
+                    y_p = y_pred[i:i+7]
+                    if len(y_t) > 1:
+                        weekly_r2.append(r2_score(y_t, y_p))
+                    else:
+                        weekly_r2.append(None)  # 无法计算
 
                 ae = np.abs(y_true - y_pred)
                 error = y_pred - y_true
@@ -102,6 +111,9 @@ if real_file and pred_file:
 
                     st.subheader("每7天的 RMSE")
                     st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_rmse)+1)), "Weekly RMSE": weekly_rmse}))
+
+                    st.subheader("每7天的 R²")
+                    st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_r2)+1)), "Weekly R²": weekly_r2}))
 
                     st.subheader("前10个绝对误差 (AE)")
                     st.dataframe(ae.head(10))
@@ -147,5 +159,14 @@ if real_file and pred_file:
                 ax4.set_ylabel("RMSE")
                 ax4.legend()
                 st.pyplot(fig4)
+
+                # 新增：每周R²折线图
+                fig5, ax5 = plt.subplots(figsize=(10, 4))
+                ax5.plot(weekly_r2, marker='o', label="Weekly R²", color='green')
+                ax5.set_title(f"Weekly R² for {target_col}")
+                ax5.set_xlabel("Week Index")
+                ax5.set_ylabel("R²")
+                ax5.legend()
+                st.pyplot(fig5)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
