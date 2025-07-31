@@ -5,7 +5,6 @@ import requests
 import pandas as pd
 from datetime import datetime
 from dateutil import parser
-import chardet
 
 # -------------------- API 3: NASA POWER --------------------
 def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
