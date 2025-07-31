@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import chardet
 from datetime import datetime
 from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py
 
@@ -61,20 +60,14 @@ if real_file and pred_file:
         df_real = read_csv_with_encoding_detection(real_file)
         df_pred = read_csv_with_encoding_detection(pred_file)
 
-        # 自动对齐时间并查找共同字段
-        common_cols = [col for col in df_real.columns if col in df_pred.columns and col != "date"]
-        if "date" not in df_real.columns or "date" not in df_pred.columns:
-            st.error("❌ 两个文件都必须包含 `date` 列")
-        elif not common_cols:
+        # 按列名自动检测公共字段
+        common_cols = [col for col in df_real.columns if col in df_pred.columns]
+        if not common_cols:
             st.error("❌ 未找到两个文件中共有的对比字段")
         else:
-            df_real["date"] = pd.to_datetime(df_real["date"])
-            df_pred["date"] = pd.to_datetime(df_pred["date"])
-            merged = pd.merge(df_real, df_pred, on="date", suffixes=("_real", "_pred"))
-
             target_col = st.selectbox("请选择对比字段：", common_cols)
-            y_true = merged[f"{target_col}_real"]
-            y_pred = merged[f"{target_col}_pred"]
+            y_true = df_real[target_col].reset_index(drop=True)
+            y_pred = df_pred[target_col].reset_index(drop=True)
 
             from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
             import numpy as np
@@ -90,8 +83,8 @@ if real_file and pred_file:
 
             # 折线图
             fig, ax = plt.subplots(figsize=(10, 4))
-            ax.plot(merged["date"], y_true, label="真实值")
-            ax.plot(merged["date"], y_pred, label="预测值", linestyle="--")
+            ax.plot(y_true.index, y_true, label="真实值")
+            ax.plot(y_pred.index, y_pred, label="预测值", linestyle="--")
             ax.set_title(f"{target_col} 对比折线图")
             ax.legend()
             st.pyplot(fig)

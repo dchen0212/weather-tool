@@ -116,3 +116,46 @@ def get_weather_data(lat, lon, start_date, end_date, unit="C"):
 
     raise Exception("❌ 所有数据源都无法获取数据")
 
+
+
+# -------------------- 评估与绘图工具函数 --------------------
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+def evaluate_and_plot_predictions(y_true, y_pred, field_name):
+    """裁剪长度一致，计算 MAE/RMSE/R² 并画拟合图"""
+    import streamlit as st
+    min_len = min(len(y_true), len(y_pred))
+    y_true = y_true[:min_len]
+    y_pred = y_pred[:min_len]
+
+    # 计算误差指标
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = mean_squared_error(y_true, y_pred, squared=False)
+    r2 = r2_score(y_true, y_pred)
+
+    # 显示指标
+    st.markdown(f"**MAE**: {mae:.3f}")
+    st.markdown(f"**RMSE**: {rmse:.3f}")
+    st.markdown(f"**R²**: {r2:.3f}")
+
+    # 折线图（原来的）
+    fig1, ax1 = plt.subplots()
+    ax1.plot(getattr(y_true, "values", y_true), label="真实值", linewidth=1.5)
+    ax1.plot(getattr(y_pred, "values", y_pred), "--", label="预测值", linewidth=1.5)
+    ax1.set_title(f"{field_name} 时间序列对比")
+    ax1.legend()
+    st.pyplot(fig1)
+
+    # 拟合图：真实 vs 预测
+    fig2, ax2 = plt.subplots()
+    ax2.scatter(y_true, y_pred, s=10, alpha=0.6)
+    z = np.polyfit(y_true, y_pred, 1)
+    p = np.poly1d(z)
+    ax2.plot(y_true, p(y_true), "r--", label="拟合线")
+    ax2.set_xlabel("真实值")
+    ax2.set_ylabel("预测值")
+    ax2.set_title(f"{field_name} 拟合图")
+    ax2.legend()
+    st.pyplot(fig2)
