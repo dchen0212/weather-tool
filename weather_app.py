@@ -92,28 +92,45 @@ if real_file and pred_file:
                 # 每7天计算 MAE 并绘图
                 weekly_mae = [mean_absolute_error(y_true[i:i+7], y_pred[i:i+7]) for i in range(0, len(y_true), 7)]
                 weekly_rmse = [np.sqrt(mean_squared_error(y_true[i:i+7], y_pred[i:i+7])) for i in range(0, len(y_true), 7)]
-                # 计算每周 R²
-                weekly_r2 = []
-                for i in range(0, len(y_true), 7):
-                    y_t = y_true[i:i+7]
-                    y_p = y_pred[i:i+7]
-                    if len(y_t) > 1:
-                        weekly_r2.append(r2_score(y_t, y_p))
-                    else:
-                        weekly_r2.append(None)  # 无法计算
+                weekly_r2 = [r2_score(y_true[i:i+7], y_pred[i:i+7]) for i in range(0, len(y_true), 7)]
+
+                # 新增每两周和每月误差计算
+                biweekly_mae = [mean_absolute_error(y_true[i:i+14], y_pred[i:i+14]) for i in range(0, len(y_true), 14)]
+                monthly_mae = [mean_absolute_error(y_true[i:i+30], y_pred[i:i+30]) for i in range(0, len(y_true), 30)]
+
+                biweekly_rmse = [np.sqrt(mean_squared_error(y_true[i:i+14], y_pred[i:i+14])) for i in range(0, len(y_true), 14)]
+                monthly_rmse = [np.sqrt(mean_squared_error(y_true[i:i+30], y_pred[i:i+30])) for i in range(0, len(y_true), 30)]
+
+                biweekly_r2 = [r2_score(y_true[i:i+14], y_pred[i:i+14]) for i in range(0, len(y_true), 14)]
+                monthly_r2 = [r2_score(y_true[i:i+30], y_pred[i:i+30]) for i in range(0, len(y_true), 30)]
 
                 ae = np.abs(y_true - y_pred)
                 error = y_pred - y_true
 
+                interval = st.selectbox("选择时间尺度", ["每周", "每两周", "每月"], key="interval_select")
+
+                if interval == "每周":
+                    mae_vals = weekly_mae
+                    rmse_vals = weekly_rmse
+                    r2_vals = weekly_r2
+                elif interval == "每两周":
+                    mae_vals = biweekly_mae
+                    rmse_vals = biweekly_rmse
+                    r2_vals = biweekly_r2
+                else:
+                    mae_vals = monthly_mae
+                    rmse_vals = monthly_rmse
+                    r2_vals = monthly_r2
+
                 with st.expander("📊 查看详细误差信息"):
-                    st.subheader("每7天的 MAE")
-                    st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_mae)+1)), "Weekly MAE": weekly_mae}))
+                    st.subheader(f"{interval} MAE")
+                    st.dataframe(pd.DataFrame({"Interval": list(range(1, len(mae_vals)+1)), "MAE": mae_vals}))
 
-                    st.subheader("每7天的 RMSE")
-                    st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_rmse)+1)), "Weekly RMSE": weekly_rmse}))
+                    st.subheader(f"{interval} RMSE")
+                    st.dataframe(pd.DataFrame({"Interval": list(range(1, len(rmse_vals)+1)), "RMSE": rmse_vals}))
 
-                    st.subheader("每7天的 R²")
-                    st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_r2)+1)), "Weekly R²": weekly_r2}))
+                    st.subheader(f"{interval} R²")
+                    st.dataframe(pd.DataFrame({"Interval": list(range(1, len(r2_vals)+1)), "R²": r2_vals}))
 
                     st.subheader("前10个绝对误差 (AE)")
                     st.dataframe(ae.head(10))
@@ -145,26 +162,25 @@ if real_file and pred_file:
                 st.pyplot(fig2)
 
                 fig3, ax3 = plt.subplots(figsize=(10, 4))
-                ax3.plot(weekly_mae, marker='o', label="Weekly MAE")
-                ax3.set_title(f"Weekly MAE for {target_col}")
-                ax3.set_xlabel("Week Index")
+                ax3.plot(mae_vals, marker='o', label=f"{interval} MAE")
+                ax3.set_title(f"{interval} MAE for {target_col}")
+                ax3.set_xlabel("Interval Index")
                 ax3.set_ylabel("MAE")
                 ax3.legend()
                 st.pyplot(fig3)
 
                 fig4, ax4 = plt.subplots(figsize=(10, 4))
-                ax4.plot(weekly_rmse, marker='o', label="Weekly RMSE", color='orange')
-                ax4.set_title(f"Weekly RMSE for {target_col}")
-                ax4.set_xlabel("Week Index")
+                ax4.plot(rmse_vals, marker='o', label=f"{interval} RMSE", color='orange')
+                ax4.set_title(f"{interval} RMSE for {target_col}")
+                ax4.set_xlabel("Interval Index")
                 ax4.set_ylabel("RMSE")
                 ax4.legend()
                 st.pyplot(fig4)
 
-                # 新增：每周R²折线图
                 fig5, ax5 = plt.subplots(figsize=(10, 4))
-                ax5.plot(weekly_r2, marker='o', label="Weekly R²", color='green')
-                ax5.set_title(f"Weekly R² for {target_col}")
-                ax5.set_xlabel("Week Index")
+                ax5.plot(r2_vals, marker='o', label=f"{interval} R²", color='green')
+                ax5.set_title(f"{interval} R² for {target_col}")
+                ax5.set_xlabel("Interval Index")
                 ax5.set_ylabel("R²")
                 ax5.legend()
                 st.pyplot(fig5)
