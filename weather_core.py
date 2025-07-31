@@ -139,9 +139,19 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ 出现错误：{e}")
 
+# -------------------- 新增函数: 根据 CSV 自动推断温度列 --------------------
+def infer_column_from_csv(df):
+    """自动判断 CSV 中存在的温度列名，可返回 t_avg / t_mean / temp / t_max / t_min"""
+    candidates = ["t_avg", "t_mean", "temperature", "temp", "t_max", "t_min"]
+    found = [col for col in candidates if col in df.columns]
+    if not found:
+        raise ValueError("CSV 文件中未找到可识别的温度列名（如 t_avg, t_max, t_min 等）。")
+    return found[0]  # 默认优先使用第一个匹配到的
 
 # -------------------- 预测与真实数据对比分析 --------------------
-def compare_prediction_with_real(real_df, pred_df, column):
+def compare_prediction_with_real(real_df, pred_df, column=None):
+    if column is None:
+        column = infer_column_from_csv(real_df)
     try:
         real_df["date"] = pd.to_datetime(real_df["date"])
         pred_df["date"] = pd.to_datetime(pred_df["date"])
