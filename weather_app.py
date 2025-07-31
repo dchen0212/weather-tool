@@ -74,6 +74,13 @@ if real_file and pred_file:
                 y_true = df_real[target_col].reset_index(drop=True)
                 y_pred = df_pred[target_col].reset_index(drop=True)
 
+                # 数据预览（前10行）
+                st.subheader("📌 数据预览 (前10行)")
+                st.dataframe(pd.DataFrame({
+                    "真实值": y_true.head(10),
+                    "预测值": y_pred.head(10)
+                }))
+
                 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
                 import numpy as np
                 import matplotlib.pyplot as plt
