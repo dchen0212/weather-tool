@@ -93,6 +93,13 @@ if real_file and pred_file:
                 st.write(f"**RMSE**: {rmse:.3f}")
                 st.write(f"**R²**: {r2:.3f}")
 
+                ae = np.abs(y_true - y_pred)
+                error = y_pred - y_true
+                st.write(f"**AE (绝对误差)**（前10个）:")
+                st.dataframe(ae.head(10))
+                st.write(f"**Error (误差)**（前10个）:")
+                st.dataframe(error.head(10))
+
                 # 折线图
                 fig, ax = plt.subplots(figsize=(10, 4))
                 ax.plot(y_true.index, y_true, label="真实值")
@@ -102,5 +109,14 @@ if real_file and pred_file:
                 ax.set_ylabel(target_col)
                 ax.legend(["True Value", "Predicted Value"])
                 st.pyplot(fig)
+
+                fig2, ax2 = plt.subplots(figsize=(10, 4))
+                ax2.plot(ae, label="Absolute Error (AE)")
+                ax2.plot(error, label="Error")
+                ax2.set_title(f"{target_col} Error Line Chart")
+                ax2.set_xlabel("Index")
+                ax2.set_ylabel("Error Value")
+                ax2.legend()
+                st.pyplot(fig2)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
