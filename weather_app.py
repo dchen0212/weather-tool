@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py 中
+from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py
 
 st.set_page_config(page_title="天气数据查询", layout="centered")
 
@@ -38,33 +38,59 @@ if st.button("获取天气数据"):
                 st.error(f"❌ 出错：{e}")
 
 
-# --- 预测数据对比分析 ---
+# --- 真实 vs 预测数据对比分析 ---
 st.markdown("---")
-st.header("📊 预测数据对比分析")
+st.header("📊 真实 vs 预测数据对比分析")
 
-uploaded_file = st.file_uploader("📂 上传预测 CSV 文件（必须包含 date 和字段列）", type="csv")
+real_file = st.file_uploader("📂 上传真实天气 CSV 文件", type="csv", key="real")
+pred_file = st.file_uploader("📂 上传预测天气 CSV 文件", type="csv", key="pred")
 
-if uploaded_file:
-    df_pred = pd.read_csv(uploaded_file)
+if real_file and pred_file:
     try:
-        # 预测数据中必须包含的字段
-        target_cols = [col for col in ["t_avg", "t_max", "t_min", "precip", "solar_rad"] if col in df_pred.columns]
-        if not target_cols:
-            st.warning("⚠️ 预测文件中没有识别到有效字段。")
+        # 自动尝试不同编码读取
+        def read_csv_auto(file_obj):
+            try:
+                return pd.read_csv(file_obj, encoding="utf-8")
+            except UnicodeDecodeError:
+                file_obj.seek(0)
+                return pd.read_csv(file_obj, encoding="gbk")
+
+        df_real = read_csv_auto(real_file)
+        df_pred = read_csv_auto(pred_file)
+
+        # 自动对齐时间并查找共同字段
+        common_cols = [col for col in df_real.columns if col in df_pred.columns and col != "date"]
+        if "date" not in df_real.columns or "date" not in df_pred.columns:
+            st.error("❌ 两个文件都必须包含 `date` 列")
+        elif not common_cols:
+            st.error("❌ 未找到两个文件中共有的对比字段")
         else:
-            target_col = st.selectbox("请选择对比字段：", target_cols)
+            df_real["date"] = pd.to_datetime(df_real["date"])
+            df_pred["date"] = pd.to_datetime(df_pred["date"])
+            merged = pd.merge(df_real, df_pred, on="date", suffixes=("_real", "_pred"))
 
-            # 读取 session 中的真实数据
-            if "df" in locals():
-                df_real = df
-                from weather_core import compare_prediction_with_real
-                result = compare_prediction_with_real(df_real, df_pred, target_col)
+            target_col = st.selectbox("请选择对比字段：", common_cols)
+            y_true = merged[f"{target_col}_real"]
+            y_pred = merged[f"{target_col}_pred"]
 
-                st.write(f"**MAE**: {result['mae']:.3f}")
-                st.write(f"**RMSE**: {result['rmse']:.3f}")
-                st.write(f"**R²**: {result['r2']:.3f}")
-                st.pyplot(result["fig"])
-            else:
-                st.info("请先获取真实天气数据，然后再上传预测文件进行对比。")
+            from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+            import numpy as np
+            import matplotlib.pyplot as plt
+
+            mae = mean_absolute_error(y_true, y_pred)
+            rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+            r2 = r2_score(y_true, y_pred)
+
+            st.write(f"**MAE**: {mae:.3f}")
+            st.write(f"**RMSE**: {rmse:.3f}")
+            st.write(f"**R²**: {r2:.3f}")
+
+            # 折线图
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.plot(merged["date"], y_true, label="真实值")
+            ax.plot(merged["date"], y_pred, label="预测值", linestyle="--")
+            ax.set_title(f"{target_col} 对比折线图")
+            ax.legend()
+            st.pyplot(fig)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
