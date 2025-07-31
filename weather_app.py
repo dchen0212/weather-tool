@@ -3,7 +3,15 @@ import pandas as pd
 import chardet
 from datetime import datetime
 from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py
-from weather_core import read_csv_with_encoding_detection
+
+# 自动检测编码读取 CSV 文件
+def read_csv_with_encoding_detection(uploaded_file):
+    import chardet
+    raw = uploaded_file.read()
+    result = chardet.detect(raw)
+    encoding = result['encoding']
+    uploaded_file.seek(0)
+    return pd.read_csv(uploaded_file, encoding=encoding)
 
 st.set_page_config(page_title="天气数据查询", layout="centered")
 

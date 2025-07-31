@@ -1,5 +1,19 @@
 import requests
 import pandas as pd
+import chardet
+
+# -------------------- CSV 编码检测与读取 --------------------
+def read_csv_with_encoding_detection(file_obj):
+    """自动检测编码并读取 CSV 文件"""
+    raw = file_obj.read()
+    result = chardet.detect(raw)
+    encoding = result["encoding"] or "utf-8"
+    file_obj.seek(0)  # 重置文件指针
+    try:
+        df = pd.read_csv(file_obj, encoding=encoding)
+        return df
+    except Exception as e:
+        raise ValueError(f"读取失败，尝试使用编码 {encoding}，错误：{e}")
 
 # -------------------- API 3: NASA POWER --------------------
 def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
@@ -102,17 +116,3 @@ def get_weather_data(lat, lon, start_date, end_date, unit="C"):
 
     raise Exception("❌ 所有数据源都无法获取数据")
 
-# -------------------- CSV 编码检测与读取 --------------------
-import chardet
-
-def read_csv_with_encoding_detection(file_obj):
-    """自动检测编码并读取 CSV 文件"""
-    raw = file_obj.read()
-    result = chardet.detect(raw)
-    encoding = result["encoding"] or "utf-8"
-    file_obj.seek(0)  # 重置文件指针
-    try:
-        df = pd.read_csv(file_obj, encoding=encoding)
-        return df
-    except Exception as e:
-        raise ValueError(f"读取失败，尝试使用编码 {encoding}，错误：{e}")
