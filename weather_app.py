@@ -109,6 +109,13 @@ if real_file and pred_file:
 
                 interval = st.selectbox("选择时间尺度", ["每周", "每两周", "每月"], key="interval_select")
 
+                interval_map = {
+                    "每周": "Weekly",
+                    "每两周": "Biweekly",
+                    "每月": "Monthly"
+                }
+                interval_en = interval_map[interval]
+
                 if interval == "每周":
                     mae_vals = weekly_mae
                     rmse_vals = weekly_rmse
@@ -162,24 +169,24 @@ if real_file and pred_file:
                 st.pyplot(fig2)
 
                 fig3, ax3 = plt.subplots(figsize=(10, 4))
-                ax3.plot(mae_vals, marker='o', label=f"{interval} MAE")
-                ax3.set_title(f"{interval} MAE for {target_col}")
+                ax3.plot(mae_vals, marker='o', label=f"{interval_en} MAE")
+                ax3.set_title(f"{interval_en} MAE for {target_col}")
                 ax3.set_xlabel("Interval Index")
                 ax3.set_ylabel("MAE")
                 ax3.legend()
                 st.pyplot(fig3)
 
                 fig4, ax4 = plt.subplots(figsize=(10, 4))
-                ax4.plot(rmse_vals, marker='o', label=f"{interval} RMSE", color='orange')
-                ax4.set_title(f"{interval} RMSE for {target_col}")
+                ax4.plot(rmse_vals, marker='o', label=f"{interval_en} RMSE", color='orange')
+                ax4.set_title(f"{interval_en} RMSE for {target_col}")
                 ax4.set_xlabel("Interval Index")
                 ax4.set_ylabel("RMSE")
                 ax4.legend()
                 st.pyplot(fig4)
 
                 fig5, ax5 = plt.subplots(figsize=(10, 4))
-                ax5.plot(r2_vals, marker='o', label=f"{interval} R²", color='green')
-                ax5.set_title(f"{interval} R² for {target_col}")
+                ax5.plot(r2_vals, marker='o', label=f"{interval_en} R²", color='green')
+                ax5.set_title(f"{interval_en} R² for {target_col}")
                 ax5.set_xlabel("Interval Index")
                 ax5.set_ylabel("R²")
                 ax5.legend()
