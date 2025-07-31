@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
+import chardet
 from datetime import datetime
 from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py
+from weather_core import read_csv_with_encoding_detection
 
 st.set_page_config(page_title="天气数据查询", layout="centered")
 
@@ -47,16 +49,9 @@ pred_file = st.file_uploader("📂 上传预测天气 CSV 文件", type="csv", k
 
 if real_file and pred_file:
     try:
-        # 自动尝试不同编码读取
-        def read_csv_auto(file_obj):
-            try:
-                return pd.read_csv(file_obj, encoding="utf-8")
-            except UnicodeDecodeError:
-                file_obj.seek(0)
-                return pd.read_csv(file_obj, encoding="gbk")
-
-        df_real = read_csv_auto(real_file)
-        df_pred = read_csv_auto(pred_file)
+        # 自动检测编码读取
+        df_real = read_csv_with_encoding_detection(real_file)
+        df_pred = read_csv_with_encoding_detection(pred_file)
 
         # 自动对齐时间并查找共同字段
         common_cols = [col for col in df_real.columns if col in df_pred.columns and col != "date"]
