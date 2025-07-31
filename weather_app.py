@@ -91,20 +91,23 @@ if real_file and pred_file:
 
                 # 每7天计算 MAE 并绘图
                 weekly_mae = [mean_absolute_error(y_true[i:i+7], y_pred[i:i+7]) for i in range(0, len(y_true), 7)]
-                with st.expander("📈 每7天的 MAE（点击展开）"):
+
+                ae = np.abs(y_true - y_pred)
+                error = y_pred - y_true
+
+                with st.expander("📊 查看详细误差信息"):
+                    st.subheader("每7天的 MAE")
                     st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_mae)+1)), "Weekly MAE": weekly_mae}))
+
+                    st.subheader("前10个绝对误差 (AE)")
+                    st.dataframe(ae.head(10))
+
+                    st.subheader("前10个误差 (Error)")
+                    st.dataframe(error.head(10))
 
                 st.write(f"**MAE**: {mae:.3f}")
                 st.write(f"**RMSE**: {rmse:.3f}")
                 st.write(f"**R²**: {r2:.3f}")
-
-                ae = np.abs(y_true - y_pred)
-                error = y_pred - y_true
-                with st.expander("查看前10个绝对误差 (AE)"):
-                    st.dataframe(ae.head(10))
-
-                with st.expander("查看前10个误差 (Error)"):
-                    st.dataframe(error.head(10))
 
                 # 折线图
                 fig, ax = plt.subplots(figsize=(10, 4))
