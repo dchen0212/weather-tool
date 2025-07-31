@@ -49,7 +49,7 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
             df["t_max"] = df["t_max"] + 273.15
             df["t_min"] = df["t_min"] + 273.15
             df["t_avg"] = df["t_avg"] + 273.15
-            df["unit"] = "°C"
+            df["unit"] = "K"
         else:
             df["unit"] = "C"
         return df
