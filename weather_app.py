@@ -91,6 +91,7 @@ if real_file and pred_file:
 
                 # 每7天计算 MAE 并绘图
                 weekly_mae = [mean_absolute_error(y_true[i:i+7], y_pred[i:i+7]) for i in range(0, len(y_true), 7)]
+                weekly_rmse = [np.sqrt(mean_squared_error(y_true[i:i+7], y_pred[i:i+7])) for i in range(0, len(y_true), 7)]
 
                 ae = np.abs(y_true - y_pred)
                 error = y_pred - y_true
@@ -98,6 +99,9 @@ if real_file and pred_file:
                 with st.expander("📊 查看详细误差信息"):
                     st.subheader("每7天的 MAE")
                     st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_mae)+1)), "Weekly MAE": weekly_mae}))
+
+                    st.subheader("每7天的 RMSE")
+                    st.dataframe(pd.DataFrame({"Week": list(range(1, len(weekly_rmse)+1)), "Weekly RMSE": weekly_rmse}))
 
                     st.subheader("前10个绝对误差 (AE)")
                     st.dataframe(ae.head(10))
@@ -135,5 +139,13 @@ if real_file and pred_file:
                 ax3.set_ylabel("MAE")
                 ax3.legend()
                 st.pyplot(fig3)
+
+                fig4, ax4 = plt.subplots(figsize=(10, 4))
+                ax4.plot(weekly_rmse, marker='o', label="Weekly RMSE", color='orange')
+                ax4.set_title(f"Weekly RMSE for {target_col}")
+                ax4.set_xlabel("Week Index")
+                ax4.set_ylabel("RMSE")
+                ax4.legend()
+                st.pyplot(fig4)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
