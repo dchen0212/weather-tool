@@ -126,6 +126,9 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 def evaluate_and_plot_predictions(y_true, y_pred, field_name):
     """裁剪长度一致，计算 MAE/RMSE/R² 并画拟合图"""
     import streamlit as st
+    if field_name.lower() == "date":
+        st.warning("⚠️ 字段 'date' 为时间字段，不进行误差计算。")
+        return
     min_len = min(len(y_true), len(y_pred))
     y_true = y_true[:min_len]
     y_pred = y_pred[:min_len]
