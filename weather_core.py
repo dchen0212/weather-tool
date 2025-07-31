@@ -5,6 +5,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 from dateutil import parser
+import chardet
 
 # -------------------- API 3: NASA POWER --------------------
 def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
@@ -180,3 +181,12 @@ def compare_prediction_with_real(real_df, pred_df, column=None):
     except Exception as e:
         print(f"对比分析出错: {e}")
         return None
+
+# 示例：读取预测文件时使用 chardet 自动检测编码
+# 假设有一个变量 uploaded_file 是上传的文件对象
+# 以下代码替换原来的 df_pred = pd.read_csv(uploaded_file)
+# import chardet
+# result = chardet.detect(uploaded_file.read())
+# uploaded_file.seek(0)
+# encoding = result["encoding"]
+# df_pred = pd.read_csv(uploaded_file, encoding=encoding)
