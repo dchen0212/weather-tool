@@ -97,8 +97,10 @@ if real_file and pred_file:
                 fig, ax = plt.subplots(figsize=(10, 4))
                 ax.plot(y_true.index, y_true, label="真实值")
                 ax.plot(y_pred.index, y_pred, label="预测值", linestyle="--")
-                ax.set_title(f"{target_col} 对比折线图")
-                ax.legend()
+                ax.set_title(f"{target_col} Comparison Line Chart")
+                ax.set_xlabel("Index")
+                ax.set_ylabel(target_col)
+                ax.legend(["True Value", "Predicted Value"])
                 st.pyplot(fig)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
