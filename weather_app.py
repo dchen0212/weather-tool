@@ -47,8 +47,10 @@ if st.button("获取天气数据"):
                 st.error(f"❌ 出错：{e}")
 
 
-# 只有在 real_file 和 pred_file 都已上传时才进行分析
+real_file = st.file_uploader("上传真实天气 CSV 文件", type=["csv"], key="real_file")
+pred_file = st.file_uploader("上传预测天气 CSV 文件", type=["csv"], key="pred_file")
 
+# 只有在 real_file 和 pred_file 都已上传时才进行分析
 if real_file and pred_file:
     try:
         # 自动检测编码读取
