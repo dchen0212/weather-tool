@@ -47,12 +47,8 @@ if st.button("获取天气数据"):
                 st.error(f"❌ 出错：{e}")
 
 
-# --- 真实 vs 预测数据对比分析 ---
-st.markdown("---")
-st.header("📊 真实 vs 预测数据对比分析")
 
-real_file = st.file_uploader("📂 上传真实天气 CSV 文件", type="csv", key="real")
-pred_file = st.file_uploader("📂 上传预测天气 CSV 文件", type="csv", key="pred")
+unit_code = "C" if "摄氏" in unit else "K"
 
 # --- 预测 NC 文件读取与 CSV 导出模块 ---
 st.markdown("---")
@@ -121,6 +117,7 @@ if nc_file is not None:
 
     except Exception as e:
         st.error(f"❌ 处理 NC 文件出错：{e}")
+
 
 # 只有在 real_file 和 pred_file 都已上传时才进行分析
 
@@ -272,6 +269,7 @@ st.markdown("---")
 if 'df_real' in locals() and 'df_pred' in locals():
     # 自动检测降水和光照字段
     compare_fields = ["precipitation", "radiation"]
+    # 检查 df_real 和 df_pred 是否同时包含降水与光照列
     existing_fields = [col for col in compare_fields if col in df_real.columns and col in df_pred.columns]
 
     for field in existing_fields:
