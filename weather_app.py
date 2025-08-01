@@ -50,70 +50,130 @@ if st.button("获取天气数据"):
 st.markdown("---")
 st.header("📂 预测 NC 数据转换为 CSV")
 
+import netCDF4 as nc
+import numpy as np
+import h5py
+
+# 天气参数分类关键词
+weather_categories = {
+    'temperature': {'keywords': ['temp', 't2m', 'temperature', 'air_temp', 'ta']},
+    'wind': {'keywords': ['wind', 'u', 'v', 'wind_speed', 'ua', 'va']},
+    'humidity': {'keywords': ['humidity', 'rh', 'q', 'hus']},
+    'pressure': {'keywords': ['pressure', 'sp', 'slp']},
+    'precipitation': {'keywords': ['precip', 'rain', 'snow', 'prcp']},
+    'radiation': {'keywords': ['rad', 'solar', 'swdown']},
+    'geopotential': {'keywords': ['zg', 'geopotential', 'height']}
+}
+
+def identify_weather_vars(nc_file):
+    """识别文件中的天气变量并分类"""
+    identified = {}
+    for var_name in nc_file.variables:
+        if var_name.lower() in ['time', 'latitude', 'longitude', 'lat', 'lon', 'level', 'pressure']:
+            continue
+        var_name_lower = var_name.lower()
+        for category, props in weather_categories.items():
+            if any(kw in var_name_lower for kw in props['keywords']):
+                identified[var_name] = category
+                break
+    return identified
+
+def extract_location_data(var, lat_idx, lon_idx):
+    """提取特定位置的数据并展平"""
+    try:
+        dims = var.dimensions
+        if len(dims) == 4:
+            data = var[:, 0, lat_idx, lon_idx]
+        elif len(dims) == 3:
+            data = var[:, lat_idx, lon_idx]
+        elif len(dims) == 2:
+            data = var[:, lat_idx]
+        else:
+            data = var[:]
+        if hasattr(data, "ndim") and data.ndim > 1:
+            data = data.flatten()
+        return data
+    except Exception:
+        return None
+
+def process_nc_streamlit(uploaded_file):
+    """处理上传的NC文件"""
+    try:
+        ds = nc.Dataset(uploaded_file, 'r')
+        return process_valid_nc(ds)
+    except OSError as e:
+        if 'NetCDF: HDF error' in str(e):
+            return process_hdf5_streamlit(uploaded_file)
+        else:
+            st.error(f"❌ 处理失败: {e}")
+            return None
+
+def process_valid_nc(nc_file):
+    """正常netCDF4处理"""
+    lat_var = nc_file.variables.get('latitude') or nc_file.variables.get('lat')
+    lon_var = nc_file.variables.get('longitude') or nc_file.variables.get('lon')
+    if lat_var is None or lon_var is None:
+        st.error("❌ 缺少经纬度变量")
+        return None
+    lats = lat_var[:]
+    lons = lon_var[:]
+    lat_idx = np.abs(lats - lats.mean()).argmin()
+    lon_idx = np.abs(lons - lons.mean()).argmin()
+    actual_lat, actual_lon = lats[lat_idx], lons[lon_idx]
+
+    time_var = nc_file.variables.get('time')
+    if time_var is not None:
+        try:
+            times = nc.num2date(time_var[:], time_var.units)
+            time_strs = [t.strftime('%Y-%m-%d %H:%M:%S') for t in times]
+        except Exception:
+            time_strs = [f"time_{i}" for i in range(len(time_var))]
+    else:
+        time_strs = [f"time_{i}" for i in range(10)]
+
+    data = {
+        "date": time_strs,
+        "lat": [actual_lat] * len(time_strs),
+        "lon": [actual_lon] * len(time_strs)
+    }
+
+    weather_vars = identify_weather_vars(nc_file)
+    for var_name, category in weather_vars.items():
+        var = nc_file.variables[var_name]
+        var_data = extract_location_data(var, lat_idx, lon_idx)
+        if var_data is not None and len(var_data) == len(time_strs):
+            data[f"{category}_{var_name}"] = var_data
+
+    return pd.DataFrame(data)
+
+def process_hdf5_streamlit(uploaded_file):
+    """HDF5兼容处理"""
+    try:
+        with h5py.File(uploaded_file, 'r') as h5_file:
+            st.error("⚠️ 暂不支持复杂HDF5解析，这里可扩展")
+            return None
+    except Exception as e:
+        st.error(f"❌ HDF5处理失败: {e}")
+        return None
+
+# 文件上传
 nc_file = st.file_uploader("上传预测 NC 文件（.nc）", type=["nc"], key="pred_nc")
 if nc_file is not None:
-    try:
-        import xarray as xr
+    df_nc = process_nc_streamlit(nc_file)
+    if df_nc is not None and not df_nc.empty:
+        st.write(f"**纬度 (Latitude)**: {df_nc['lat'].iloc[0]}")
+        st.write(f"**经度 (Longitude)**: {df_nc['lon'].iloc[0]}")
+        st.subheader("📌 预测 NC 数据预览")
+        st.dataframe(df_nc.head(10))
+        csv_data = df_nc.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "📥 下载预测数据 CSV",
+            csv_data,
+            file_name="predicted_nc_data.csv",
+            mime="text/csv"
+        )
 
-        # 读取 NC 文件
-        ds = xr.open_dataset(nc_file)
-
-        # 获取经纬度
-        lat_nc = None
-        lon_nc = None
-        for lat_key in ["lat", "latitude"]:
-            if lat_key in ds.coords:
-                lat_nc = ds[lat_key].values
-                break
-        for lon_key in ["lon", "longitude"]:
-            if lon_key in ds.coords:
-                lon_nc = ds[lon_key].values
-                break
-
-        # 输出经纬度
-        st.write("**纬度 (Latitude)**:", lat_nc)
-        st.write("**经度 (Longitude)**:", lon_nc)
-
-        # 获取时间维度
-        time_key = None
-        for t_key in ["time", "date", "dates"]:
-            if t_key in ds.coords:
-                time_key = t_key
-                break
-        if time_key is None:
-            st.error("❌ 未找到时间维度")
-        else:
-            time_values = pd.to_datetime(ds[time_key].values)
-
-            # 获取所有数据变量
-            data_vars = list(ds.data_vars)
-
-            # 生成 DataFrame
-            data_dict = {"date": time_values}
-            for var in data_vars:
-                try:
-                    data_dict[var] = ds[var].values.flatten()
-                except Exception:
-                    pass  # 跳过无法直接展平的变量
-
-            df_nc = pd.DataFrame(data_dict)
-
-            # 显示 DataFrame
-            st.subheader("📌 预测 NC 数据预览")
-            st.dataframe(df_nc.head(10))
-
-            # 导出 CSV
-            csv_data = df_nc.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "📥 下载预测数据 CSV",
-                csv_data,
-                file_name="predicted_nc_data.csv",
-                mime="text/csv"
-            )
-
-    except Exception as e:
-        st.error(f"❌ 处理 NC 文件出错：{e}")
-
+# --- 真实 vs 预测 CSV 数据对比模块 ---
 real_file = st.file_uploader("上传真实天气 CSV 文件", type=["csv"], key="real_file")
 pred_file = st.file_uploader("上传预测天气 CSV 文件", type=["csv"], key="pred_file")
 
