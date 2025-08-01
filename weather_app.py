@@ -149,8 +149,13 @@ def process_valid_nc(nc_file):
         return None
     lats = lat_var[:]
     lons = lon_var[:]
-    lat_idx = np.abs(lats - lats.mean()).argmin()
-    lon_idx = np.abs(lons - lons.mean()).argmin()
+
+    # 新增：用户输入目标经纬度
+    target_lat = st.number_input("提取纬度", value=39.5, format="%.3f")
+    target_lon = st.number_input("提取经度", value=116.5, format="%.3f")
+
+    lat_idx = np.abs(lats - target_lat).argmin()
+    lon_idx = np.abs(lons - target_lon).argmin()
     actual_lat, actual_lon = lats[lat_idx], lons[lon_idx]
 
     time_var = nc_file.variables.get('time')
