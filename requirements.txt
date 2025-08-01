@@ -9,3 +9,4 @@ numpy~=2.3.2
 netCDF4~=1.7.2
 xarray~=2025.7.1
 h5netcdf~=1.6.3
+h5py
