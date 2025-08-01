@@ -46,6 +46,73 @@ if st.button("获取天气数据"):
             except Exception as e:
                 st.error(f"❌ 出错：{e}")
 
+# --- 预测 NC 文件读取与 CSV 导出模块 ---
+st.markdown("---")
+st.header("📂 预测 NC 数据转换为 CSV")
+
+nc_file = st.file_uploader("上传预测 NC 文件（.nc）", type=["nc"], key="pred_nc")
+if nc_file is not None:
+    try:
+        import xarray as xr
+
+        # 读取 NC 文件
+        ds = xr.open_dataset(nc_file)
+
+        # 获取经纬度
+        lat_nc = None
+        lon_nc = None
+        for lat_key in ["lat", "latitude"]:
+            if lat_key in ds.coords:
+                lat_nc = ds[lat_key].values
+                break
+        for lon_key in ["lon", "longitude"]:
+            if lon_key in ds.coords:
+                lon_nc = ds[lon_key].values
+                break
+
+        # 输出经纬度
+        st.write("**纬度 (Latitude)**:", lat_nc)
+        st.write("**经度 (Longitude)**:", lon_nc)
+
+        # 获取时间维度
+        time_key = None
+        for t_key in ["time", "date", "dates"]:
+            if t_key in ds.coords:
+                time_key = t_key
+                break
+        if time_key is None:
+            st.error("❌ 未找到时间维度")
+        else:
+            time_values = pd.to_datetime(ds[time_key].values)
+
+            # 获取所有数据变量
+            data_vars = list(ds.data_vars)
+
+            # 生成 DataFrame
+            data_dict = {"date": time_values}
+            for var in data_vars:
+                try:
+                    data_dict[var] = ds[var].values.flatten()
+                except Exception:
+                    pass  # 跳过无法直接展平的变量
+
+            df_nc = pd.DataFrame(data_dict)
+
+            # 显示 DataFrame
+            st.subheader("📌 预测 NC 数据预览")
+            st.dataframe(df_nc.head(10))
+
+            # 导出 CSV
+            csv_data = df_nc.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "📥 下载预测数据 CSV",
+                csv_data,
+                file_name="predicted_nc_data.csv",
+                mime="text/csv"
+            )
+
+    except Exception as e:
+        st.error(f"❌ 处理 NC 文件出错：{e}")
 
 real_file = st.file_uploader("上传真实天气 CSV 文件", type=["csv"], key="real_file")
 pred_file = st.file_uploader("上传预测天气 CSV 文件", type=["csv"], key="pred_file")
@@ -192,72 +259,3 @@ if real_file and pred_file:
                 st.pyplot(fig5)
     except Exception as e:
         st.error(f"❌ 对比出错：{e}")
-
-
-# --- 预测 NC 文件读取与 CSV 导出模块 ---
-st.markdown("---")
-st.header("📂 预测 NC 数据转换为 CSV")
-
-nc_file = st.file_uploader("上传预测 NC 文件（.nc）", type=["nc"], key="pred_nc")
-if nc_file is not None:
-    try:
-        import xarray as xr
-
-        # 读取 NC 文件
-        ds = xr.open_dataset(nc_file)
-
-        # 获取经纬度
-        lat_nc = None
-        lon_nc = None
-        for lat_key in ["lat", "latitude"]:
-            if lat_key in ds.coords:
-                lat_nc = ds[lat_key].values
-                break
-        for lon_key in ["lon", "longitude"]:
-            if lon_key in ds.coords:
-                lon_nc = ds[lon_key].values
-                break
-
-        # 输出经纬度
-        st.write("**纬度 (Latitude)**:", lat_nc)
-        st.write("**经度 (Longitude)**:", lon_nc)
-
-        # 获取时间维度
-        time_key = None
-        for t_key in ["time", "date", "dates"]:
-            if t_key in ds.coords:
-                time_key = t_key
-                break
-        if time_key is None:
-            st.error("❌ 未找到时间维度")
-        else:
-            time_values = pd.to_datetime(ds[time_key].values)
-
-            # 获取所有数据变量
-            data_vars = list(ds.data_vars)
-
-            # 生成 DataFrame
-            data_dict = {"date": time_values}
-            for var in data_vars:
-                try:
-                    data_dict[var] = ds[var].values.flatten()
-                except Exception:
-                    pass  # 跳过无法直接展平的变量
-
-            df_nc = pd.DataFrame(data_dict)
-
-            # 显示 DataFrame
-            st.subheader("📌 预测 NC 数据预览")
-            st.dataframe(df_nc.head(10))
-
-            # 导出 CSV
-            csv_data = df_nc.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "📥 下载预测数据 CSV",
-                csv_data,
-                file_name="predicted_nc_data.csv",
-                mime="text/csv"
-            )
-
-    except Exception as e:
-        st.error(f"❌ 处理 NC 文件出错：{e}")
