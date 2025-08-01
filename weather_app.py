@@ -9,11 +9,14 @@ import os
 # 自动检测编码读取 CSV 文件
 def read_csv_with_encoding_detection(uploaded_file):
     import chardet
-    raw = uploaded_file.read()
-    result = chardet.detect(raw)
+    pos = uploaded_file.tell()
+    sample = uploaded_file.read(1024)
+    result = chardet.detect(sample)
     encoding = result['encoding']
+    uploaded_file.seek(pos)
+    df = pd.read_csv(uploaded_file, encoding=encoding)
     uploaded_file.seek(0)
-    return pd.read_csv(io.BytesIO(raw), encoding=encoding)
+    return df
 
 st.set_page_config(page_title="天气数据查询", layout="centered")
 
@@ -93,8 +96,13 @@ def extract_location_data(var, lat_idx, lon_idx):
             data = var[:, lat_idx]
         else:
             data = var[:]
-        if hasattr(data, "ndim") and data.ndim > 1:
-            data = data.flatten()
+        if hasattr(data, "ndim"):
+            if data.ndim == 0:
+                data = [data.item()]
+            elif data.ndim == 1:
+                data = data
+            else:
+                data = data.flatten()
         return data
     except Exception:
         return None
@@ -110,6 +118,8 @@ def process_nc_streamlit(uploaded_file):
                 result = process_valid_nc(ds)
                 ds.close()
                 os.unlink(tmp_file.name)
+                if result is None:
+                    return pd.DataFrame()
                 return result
             except OSError as e:
                 if 'NetCDF: HDF error' in str(e):
@@ -117,18 +127,18 @@ def process_nc_streamlit(uploaded_file):
                         with h5py.File(tmp_file.name, 'r') as h5_file:
                             os.unlink(tmp_file.name)
                             st.error("⚠️ 暂不支持复杂HDF5解析，这里可扩展")
-                            return None
+                            return pd.DataFrame()
                     except Exception as e2:
                         os.unlink(tmp_file.name)
                         st.error(f"❌ HDF5处理失败: {e2}")
-                        return None
+                        return pd.DataFrame()
                 else:
                     os.unlink(tmp_file.name)
                     st.error(f"❌ 处理失败: {e}")
-                    return None
+                    return pd.DataFrame()
     except Exception as e:
         st.error(f"❌ 处理失败: {e}")
-        return None
+        return pd.DataFrame()
 
 def process_valid_nc(nc_file):
     """正常netCDF4处理"""
