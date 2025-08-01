@@ -7,3 +7,4 @@ matplotlib~=3.10.3
 chardet~=5.2.0
 numpy~=2.3.2
 netCDF4~=1.7.2
+xarray~=2025.7.1
