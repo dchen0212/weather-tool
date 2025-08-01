@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py
+import io
+import tempfile
+import os
 
 # 自动检测编码读取 CSV 文件
 def read_csv_with_encoding_detection(uploaded_file):
@@ -10,7 +13,7 @@ def read_csv_with_encoding_detection(uploaded_file):
     result = chardet.detect(raw)
     encoding = result['encoding']
     uploaded_file.seek(0)
-    return pd.read_csv(uploaded_file, encoding=encoding)
+    return pd.read_csv(io.BytesIO(raw), encoding=encoding)
 
 st.set_page_config(page_title="天气数据查询", layout="centered")
 
@@ -99,14 +102,33 @@ def extract_location_data(var, lat_idx, lon_idx):
 def process_nc_streamlit(uploaded_file):
     """处理上传的NC文件"""
     try:
-        ds = nc.Dataset(uploaded_file, 'r')
-        return process_valid_nc(ds)
-    except OSError as e:
-        if 'NetCDF: HDF error' in str(e):
-            return process_hdf5_streamlit(uploaded_file)
-        else:
-            st.error(f"❌ 处理失败: {e}")
-            return None
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".nc") as tmp_file:
+            tmp_file.write(uploaded_file.read())
+            tmp_file.flush()
+            try:
+                ds = nc.Dataset(tmp_file.name, 'r')
+                result = process_valid_nc(ds)
+                ds.close()
+                os.unlink(tmp_file.name)
+                return result
+            except OSError as e:
+                if 'NetCDF: HDF error' in str(e):
+                    try:
+                        with h5py.File(tmp_file.name, 'r') as h5_file:
+                            os.unlink(tmp_file.name)
+                            st.error("⚠️ 暂不支持复杂HDF5解析，这里可扩展")
+                            return None
+                    except Exception as e2:
+                        os.unlink(tmp_file.name)
+                        st.error(f"❌ HDF5处理失败: {e2}")
+                        return None
+                else:
+                    os.unlink(tmp_file.name)
+                    st.error(f"❌ 处理失败: {e}")
+                    return None
+    except Exception as e:
+        st.error(f"❌ 处理失败: {e}")
+        return None
 
 def process_valid_nc(nc_file):
     """正常netCDF4处理"""
@@ -145,16 +167,6 @@ def process_valid_nc(nc_file):
             data[f"{category}_{var_name}"] = var_data
 
     return pd.DataFrame(data)
-
-def process_hdf5_streamlit(uploaded_file):
-    """HDF5兼容处理"""
-    try:
-        with h5py.File(uploaded_file, 'r') as h5_file:
-            st.error("⚠️ 暂不支持复杂HDF5解析，这里可扩展")
-            return None
-    except Exception as e:
-        st.error(f"❌ HDF5处理失败: {e}")
-        return None
 
 # 文件上传
 nc_file = st.file_uploader("上传预测 NC 文件（.nc）", type=["nc"], key="pred_nc")
