@@ -71,6 +71,15 @@ weather_categories = {
     'geopotential': {'keywords': ['zg', 'geopotential', 'height']}
 }
 
+# 将目标经纬度输入移到上传前
+target_lat = st.number_input("提取纬度", value=39.5, format="%.3f", key="target_lat")
+target_lon = st.number_input("提取经度", value=116.5, format="%.3f", key="target_lon")
+
+@st.cache_data
+def load_nc_dataset(tmp_file_path):
+    import netCDF4 as nc
+    return nc.Dataset(tmp_file_path, 'r')
+
 def identify_weather_vars(nc_file):
     """识别文件中的天气变量并分类"""
     identified = {}
@@ -107,40 +116,7 @@ def extract_location_data(var, lat_idx, lon_idx):
     except Exception:
         return None
 
-def process_nc_streamlit(uploaded_file):
-    """处理上传的NC文件"""
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".nc") as tmp_file:
-            tmp_file.write(uploaded_file.read())
-            tmp_file.flush()
-            try:
-                ds = nc.Dataset(tmp_file.name, 'r')
-                result = process_valid_nc(ds)
-                ds.close()
-                os.unlink(tmp_file.name)
-                if result is None:
-                    return pd.DataFrame()
-                return result
-            except OSError as e:
-                if 'NetCDF: HDF error' in str(e):
-                    try:
-                        with h5py.File(tmp_file.name, 'r') as h5_file:
-                            os.unlink(tmp_file.name)
-                            st.error("⚠️ 暂不支持复杂HDF5解析，这里可扩展")
-                            return pd.DataFrame()
-                    except Exception as e2:
-                        os.unlink(tmp_file.name)
-                        st.error(f"❌ HDF5处理失败: {e2}")
-                        return pd.DataFrame()
-                else:
-                    os.unlink(tmp_file.name)
-                    st.error(f"❌ 处理失败: {e}")
-                    return pd.DataFrame()
-    except Exception as e:
-        st.error(f"❌ 处理失败: {e}")
-        return pd.DataFrame()
-
-def process_valid_nc(nc_file):
+def process_valid_nc(nc_file, target_lat, target_lon):
     """正常netCDF4处理"""
     lat_var = nc_file.variables.get('latitude') or nc_file.variables.get('lat')
     lon_var = nc_file.variables.get('longitude') or nc_file.variables.get('lon')
@@ -149,10 +125,6 @@ def process_valid_nc(nc_file):
         return None
     lats = lat_var[:]
     lons = lon_var[:]
-
-    # 新增：用户输入目标经纬度
-    target_lat = st.number_input("提取纬度", value=39.5, format="%.3f")
-    target_lon = st.number_input("提取经度", value=116.5, format="%.3f")
 
     lat_idx = np.abs(lats - target_lat).argmin()
     lon_idx = np.abs(lons - target_lon).argmin()
@@ -182,6 +154,41 @@ def process_valid_nc(nc_file):
             data[f"{category}_{var_name}"] = var_data
 
     return pd.DataFrame(data)
+
+def process_nc_streamlit(uploaded_file):
+    """处理上传的NC文件"""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".nc") as tmp_file:
+            tmp_file.write(uploaded_file.read())
+            tmp_file.flush()
+            try:
+                # 使用缓存加载Dataset对象
+                ds = load_nc_dataset(tmp_file.name)
+                st.session_state['nc_dataset'] = ds
+                # 不关闭文件，保持缓存
+                result = process_valid_nc(ds, target_lat, target_lon)
+                os.unlink(tmp_file.name)
+                if result is None:
+                    return pd.DataFrame()
+                return result
+            except OSError as e:
+                if 'NetCDF: HDF error' in str(e):
+                    try:
+                        with h5py.File(tmp_file.name, 'r') as h5_file:
+                            os.unlink(tmp_file.name)
+                            st.error("⚠️ 暂不支持复杂HDF5解析，这里可扩展")
+                            return pd.DataFrame()
+                    except Exception as e2:
+                        os.unlink(tmp_file.name)
+                        st.error(f"❌ HDF5处理失败: {e2}")
+                        return pd.DataFrame()
+                else:
+                    os.unlink(tmp_file.name)
+                    st.error(f"❌ 处理失败: {e}")
+                    return pd.DataFrame()
+    except Exception as e:
+        st.error(f"❌ 处理失败: {e}")
+        return pd.DataFrame()
 
 # 文件上传
 nc_file = st.file_uploader("上传预测 NC 文件（.nc）", type=["nc"], key="pred_nc")
