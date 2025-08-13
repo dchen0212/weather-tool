@@ -15,6 +15,66 @@ def read_csv_with_encoding_detection(file_obj):
     except Exception as e:
         raise ValueError(f"读取失败，尝试使用编码 {encoding}，错误：{e}")
 
+# -------------------- 标准化输出列名（便于对齐） --------------------
+def standardize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename native provider columns to friendly, consistent names.
+    Keeps all columns, but ensures a canonical set exists and ordered first:
+    date, t_max, t_min, t_avg, precip, solar_rad
+    """
+    if df is None or df.empty:
+        return df
+
+    # Map both UPPERCASE (NASA) and snake_case (other sources) to friendly names
+    mapping = {
+        # NASA POWER common
+        "T2M_MAX": "t_max",
+        "T2M_MIN": "t_min",
+        "T2M": "t_avg",
+        "PRECTOTCORR": "precip",
+        "ALLSKY_SFC_SW_DWN": "solar_rad",
+        # Sometimes providers return lowercase/snake
+        "temperature_2m_max": "t_max",
+        "temperature_2m_min": "t_min",
+        "temperature_2m_mean": "t_avg",
+        "precipitation_sum": "precip",
+        "shortwave_radiation_sum": "solar_rad",
+        # Additional NASA POWER SAFE_DAILY_PARAMS mappings
+        "T2M_RANGE": "t_range",
+        "RH2M": "rel_humidity",
+        "QV2M": "spec_humidity",
+        "WS10M": "wind_speed_10m",
+        "WS50M": "wind_speed_50m",
+        "WD10M": "wind_direction_10m",
+        "PS": "surface_pressure",
+        "CLRSKY_SFC_SW_DWN": "clrsky_solar_rad",
+        "TOA_SW_DWN": "toa_solar_rad"
+    }
+
+    # Build a rename dict by scanning existing columns (case-insensitive for NASA)
+    rename_dict = {}
+    for col in list(df.columns):
+        key_upper = str(col).strip().upper()
+        key_raw = str(col).strip()
+        if key_upper in mapping:
+            rename_dict[col] = mapping[key_upper]
+        elif key_raw in mapping:
+            rename_dict[col] = mapping[key_raw]
+
+    if rename_dict:
+        df = df.rename(columns=rename_dict)
+
+    # Coerce canonical numeric columns to numeric (silently NaN on failure)
+    for c in ["t_max", "t_min", "t_avg", "precip", "solar_rad"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # Reorder: canonical first (if present), then the rest
+    canonical = ["date", "t_max", "t_min", "t_avg", "precip", "solar_rad"]
+    front = [c for c in canonical if c in df.columns]
+    rest = [c for c in df.columns if c not in front]
+    df = df[front + rest]
+    return df
+
 # -------------------- NASA POWER 参数列表获取 --------------------
 def _get_nasa_daily_parameter_list(community="RE"):
     """从 NASA POWER 元数据端点获取 *全部* 日尺度参数 ID 列表。
@@ -160,6 +220,8 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         # 列顺序：date 在前
         other_cols = [c for c in df_final.columns if c != "date"]
         df_final = df_final[["date"] + other_cols]
+        # 统一列名到友好格式，便于与预测 CSV 对齐
+        df_final = standardize_weather_columns(df_final)
         return df_final
     except Exception as e:
         print(f"NASA POWER 错误: {e}")
@@ -193,6 +255,7 @@ def get_weather_open_meteo(lat, lon, start_date, end_date):
             "solar_rad": data["daily"]["shortwave_radiation_sum"]
         })
         df = df[["date", "t_max", "t_min", "t_avg", "precip", "solar_rad"]]
+        df = standardize_weather_columns(df)
         return df
     except Exception as e:
         print(f"Open-Meteo 错误: {e}")
