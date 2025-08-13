@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 import chardet
+import numpy as np
 
 # -------------------- CSV 编码检测与读取 --------------------
 def read_csv_with_encoding_detection(file_obj):
@@ -209,10 +210,12 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
 
         # 单位：Kelvin 时把 T2M 家族改为 K
         if unit.upper() == "K":
-            for col in list(df_final.columns):
-                if col.upper().startswith("T2M"):
-                    with pd.option_context('mode.use_inf_as_na', True):
-                        df_final[col] = pd.to_numeric(df_final[col], errors='coerce') + 273.15
+            temp_keys = ["T2M", "T2M_MAX", "T2M_MIN"]  # do NOT convert T2M_RANGE (daily delta)
+            for key in temp_keys:
+                if key in df_final.columns:
+                    s = pd.to_numeric(df_final[key], errors='coerce')
+                    s = s.replace([np.inf, -np.inf], np.nan)
+                    df_final[key] = s + 273.15
             df_final["unit"] = "K"
         else:
             df_final["unit"] = "C"

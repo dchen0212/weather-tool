@@ -123,10 +123,6 @@ example_df = pd.DataFrame({
 st.caption("Example CSV (first rows)")
 st.dataframe(example_df)
 
-# Downloadable CSV template
-template_csv = example_df.to_csv(index=False).encode("utf-8")
-st.download_button("📥 Download CSV template", template_csv, file_name="weather_template.csv", mime="text/csv")
-
 real_file = st.file_uploader("Upload Real Weather CSV", type=["csv"], key="real_file")
 pred_file = st.file_uploader("Upload Predicted Weather CSV", type=["csv"], key="pred_file")
 
