@@ -15,9 +15,9 @@ def read_csv_with_encoding_detection(uploaded_file):
     uploaded_file.seek(0)
     return df
 
-st.set_page_config(page_title="Weather Data Query", layout="centered")
+st.set_page_config(page_title="Weather data acquisition and analysis", layout="centered")
 
-st.title("🌤️ Weather Data Query System")
+st.title("🌤️ Weather data acquisition and analysis")
 
 # 输入经纬度和日期范围
 lat = st.number_input("Latitude", value=32.0, format="%.6f")
