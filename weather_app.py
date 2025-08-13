@@ -61,7 +61,7 @@ st.info(
     • First row must be headers, comma-separated  
     • Numeric values only (no units in cells)  
     • Optional `date` column allowed (used only for alignment/preview)  
-    • Real and Predicted CSVs must share the same column names and row count/order
+    • The **Predicted CSV** must have exactly the same column names as the **Real Weather Data** output above (including any additional fields such as T2M_RANGE, RH2M, etc.) to ensure correct alignment and comparison  
     """
 )
 
