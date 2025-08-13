@@ -17,33 +17,34 @@ def read_csv_with_encoding_detection(file_obj):
 
 # -------------------- NASA POWER 参数列表获取 --------------------
 def _get_nasa_daily_parameter_list(community="RE"):
-    """获取 NASA POWER 可用的每日参数列表"""
-    metadata_urls = [
-        "https://power.larc.nasa.gov/api/metadata/parameter-names",
-        "https://power.larc.nasa.gov/api/temporal/daily/point?community={}&parameters=ALL&format=JSON".format(community),
-    ]
-    for url in metadata_urls:
-        try:
-            resp = requests.get(url, timeout=20)
-            if resp.status_code == 200:
+    """从 NASA POWER 元数据端点获取 *全部* 日尺度参数 ID 列表。
+    成功时返回如 ["T2M", "RH2M", ...] 的列表；失败时回退到一个安全子集。
+    """
+    try:
+        meta_url_candidates = [
+            "https://power.larc.nasa.gov/api/parameters/temporal/daily",
+            "https://power.larc.nasa.gov/api/v1/parameters/temporal/daily",
+        ]
+        for url in meta_url_candidates:
+            try:
+                resp = requests.get(url, params={"community": community, "format": "JSON"}, timeout=20)
                 data = resp.json()
-                # 尝试解析参数列表
-                if "parameters" in data:
-                    # 可能是参数元数据接口
-                    params = list(data["parameters"].keys())
-                    if params:
-                        return params
-                elif "properties" in data and "parameter" in data["properties"]:
-                    # 可能是示例数据接口，取参数键
-                    params = list(data["properties"]["parameter"].keys())
-                    if params:
-                        return params
-        except Exception:
-            continue
-    # 如果都失败，返回一个安全的最小参数集
+                if isinstance(data, dict):
+                    # 兼容两种返回结构
+                    if "parameters" in data and isinstance(data["parameters"], dict):
+                        return sorted(list(data["parameters"].keys()))
+                    if "properties" in data and "parameter" in data["properties"] and isinstance(data["properties"]["parameter"], dict):
+                        return sorted(list(data["properties"]["parameter"].keys()))
+            except Exception:
+                continue
+    except Exception:
+        pass
+    # 失败回退
     return [
-        "T2M", "T2M_MAX", "T2M_MIN",
-        "PRECTOT", "ALLSKY_SFC_SW_DWN"
+        "T2M", "T2M_MAX", "T2M_MIN", "T2M_RANGE",
+        "RH2M", "QV2M", "WS10M", "WS50M", "WD10M",
+        "PRECTOTCORR", "PRECTOT", "SNOWC", "PS",
+        "ALLSKY_SFC_SW_DWN", "CLRSKY_SFC_SW_DWN", "TOA_SW_DWN"
     ]
 
 # -------------------- API 3: NASA POWER --------------------
@@ -52,50 +53,78 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         print("尝试使用 NASA POWER API...")
         start_fmt = start_date.replace("-", "")
         end_fmt = end_date.replace("-", "")
-        params_list = _get_nasa_daily_parameter_list()
-        # 参数字符串
-        parameters = ",".join(params_list)
         url = "https://power.larc.nasa.gov/api/temporal/daily/point"
-        params = {
-            "start": start_fmt,
-            "end": end_fmt,
-            "latitude": lat,
-            "longitude": lon,
-            "parameters": parameters,
-            "format": "JSON",
-            "community": "RE"
-        }
-        resp = requests.get(url, params=params, timeout=20)
-        print("NASA POWER 原始响应前500字符：", resp.text[:500])
-        print("HTTP 状态码：", resp.status_code)
-        data = resp.json()
-        if "properties" not in data or "parameter" not in data["properties"]:
-            print("NASA POWER 返回数据格式异常")
+
+        # 1) 获取完整参数清单
+        all_params = _get_nasa_daily_parameter_list(community="RE")
+        if not all_params:
             return None
 
-        parameters = data["properties"]["parameter"]
-        # Use dates from one of the parameters as base
-        any_param = next(iter(parameters.values()))
-        records = []
-        for date in any_param:
-            record = {"date": date}
-            for param_key, param_values in parameters.items():
-                record[param_key.lower()] = param_values.get(date)
-            records.append(record)
+        # 2) 分批请求，避免 URL 过长（每批 35 个参数较稳妥）
+        def _chunks(seq, size):
+            for i in range(0, len(seq), size):
+                yield seq[i:i+size]
 
-        df = pd.DataFrame(records)
-        # Reorder columns: date first, then all parameters
-        cols = ["date"] + [c for c in df.columns if c != "date"]
-        df = df[cols]
+        df_final = None
+        for batch in _chunks(all_params, 35):
+            params_str = ",".join(batch)
+            q = {
+                "start": start_fmt,
+                "end": end_fmt,
+                "latitude": lat,
+                "longitude": lon,
+                "parameters": params_str,
+                "format": "JSON",
+                "community": "RE"
+            }
+            resp = requests.get(url, params=q, timeout=20)
+            print("POWER 批次响应预览：", resp.text[:400])
+            data = resp.json()
+            if "properties" not in data or "parameter" not in data["properties"]:
+                continue
+            pmap = data["properties"]["parameter"]  # {PARAM: {date: value}}
+            # 收集本批所有日期
+            dates = set()
+            for series in pmap.values():
+                if isinstance(series, dict):
+                    dates.update(series.keys())
+            if not dates:
+                continue
+            dates = sorted(dates)
 
+            # 构建本批 DataFrame
+            rows = []
+            for d in dates:
+                row = {"date": d}
+                for p in pmap.keys():
+                    v = pmap.get(p, {}).get(d, None)
+                    row[p] = v
+                rows.append(row)
+            df_batch = pd.DataFrame(rows)
+
+            # 合并到最终结果
+            if df_final is None:
+                df_final = df_batch
+            else:
+                df_final = pd.merge(df_final, df_batch, on="date", how="outer")
+
+        if df_final is None or df_final.empty:
+            return None
+
+        # 3) 单位处理：如需 Kelvin，则把所有 T2M 家族（前缀匹配）的字段 C->K
         if unit.upper() == "K":
-            for temp_key in ["t2m_max", "t2m_min", "t2m"]:
-                if temp_key in df.columns:
-                    df[temp_key] = df[temp_key] + 273.15
-            df["unit"] = "K"
+            for col in list(df_final.columns):
+                if col.upper().startswith("T2M"):
+                    with pd.option_context('mode.use_inf_as_na', True):
+                        df_final[col] = pd.to_numeric(df_final[col], errors='coerce') + 273.15
+            df_final["unit"] = "K"
         else:
-            df["unit"] = "C"
-        return df
+            df_final["unit"] = "C"
+
+        # 4) 排序列：date 在前
+        other_cols = [c for c in df_final.columns if c != "date"]
+        df_final = df_final[["date"] + other_cols]
+        return df_final
     except Exception as e:
         print(f"NASA POWER 错误: {e}")
         return None
