@@ -1,9 +1,12 @@
 import requests
 import pandas as pd
-import chardet
 import numpy as np
+import chardet
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # -------------------- CSV 编码检测与读取 --------------------
+
 def read_csv_with_encoding_detection(file_obj):
     """自动检测编码并读取 CSV 文件"""
     raw = file_obj.read()
@@ -17,6 +20,7 @@ def read_csv_with_encoding_detection(file_obj):
         raise ValueError(f"读取失败，尝试使用编码 {encoding}，错误：{e}")
 
 # -------------------- 标准化输出列名（便于对齐） --------------------
+
 def standardize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Rename native provider columns to friendly, consistent names.
     Keeps all columns, but ensures a canonical set exists and ordered first:
@@ -33,12 +37,6 @@ def standardize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
         "T2M": "t_avg",
         "PRECTOTCORR": "precip",
         "ALLSKY_SFC_SW_DWN": "solar_rad",
-        # Sometimes providers return lowercase/snake
-        "temperature_2m_max": "t_max",
-        "temperature_2m_min": "t_min",
-        "temperature_2m_mean": "t_avg",
-        "precipitation_sum": "precip",
-        "shortwave_radiation_sum": "solar_rad",
         # Additional NASA POWER SAFE_DAILY_PARAMS mappings
         "T2M_RANGE": "t_range",
         "RH2M": "rel_humidity",
@@ -48,7 +46,13 @@ def standardize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
         "WD10M": "wind_direction_10m",
         "PS": "surface_pressure",
         "CLRSKY_SFC_SW_DWN": "clrsky_solar_rad",
-        "TOA_SW_DWN": "toa_solar_rad"
+        "TOA_SW_DWN": "toa_solar_rad",
+        # Sometimes providers return lowercase/snake
+        "temperature_2m_max": "t_max",
+        "temperature_2m_min": "t_min",
+        "temperature_2m_mean": "t_avg",
+        "precipitation_sum": "precip",
+        "shortwave_radiation_sum": "solar_rad",
     }
 
     # Build a rename dict by scanning existing columns (case-insensitive for NASA)
@@ -65,7 +69,9 @@ def standardize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
         df = df.rename(columns=rename_dict)
 
     # Coerce canonical numeric columns to numeric (silently NaN on failure)
-    for c in ["t_max", "t_min", "t_avg", "precip", "solar_rad"]:
+    for c in ["t_max", "t_min", "t_avg", "precip", "solar_rad", "t_range",
+              "rel_humidity", "spec_humidity", "wind_speed_10m", "wind_speed_50m",
+              "wind_direction_10m", "surface_pressure", "clrsky_solar_rad", "toa_solar_rad"]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
@@ -76,39 +82,8 @@ def standardize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df[front + rest]
     return df
 
-# -------------------- NASA POWER 参数列表获取 --------------------
-def _get_nasa_daily_parameter_list(community="RE"):
-    """从 NASA POWER 元数据端点获取 *全部* 日尺度参数 ID 列表。
-    成功时返回如 ["T2M", "RH2M", ...] 的列表；失败时回退到一个安全子集。
-    """
-    try:
-        meta_url_candidates = [
-            "https://power.larc.nasa.gov/api/parameters/temporal/daily",
-            "https://power.larc.nasa.gov/api/v1/parameters/temporal/daily",
-        ]
-        for url in meta_url_candidates:
-            try:
-                resp = requests.get(url, params={"community": community, "format": "JSON"}, timeout=20)
-                data = resp.json()
-                if isinstance(data, dict):
-                    # 兼容两种返回结构
-                    if "parameters" in data and isinstance(data["parameters"], dict):
-                        return sorted(list(data["parameters"].keys()))
-                    if "properties" in data and "parameter" in data["properties"] and isinstance(data["properties"]["parameter"], dict):
-                        return sorted(list(data["properties"]["parameter"].keys()))
-            except Exception:
-                continue
-    except Exception:
-        pass
-    # 失败回退
-    return [
-        "T2M", "T2M_MAX", "T2M_MIN", "T2M_RANGE",
-        "RH2M", "QV2M", "WS10M", "WS50M", "WD10M",
-        "PRECTOTCORR", "PRECTOT", "SNOWC", "PS",
-        "ALLSKY_SFC_SW_DWN", "CLRSKY_SFC_SW_DWN", "TOA_SW_DWN"
-    ]
+# -------------------- NASA POWER（仅此数据源） --------------------
 
-# -------------------- API 3: NASA POWER --------------------
 def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
     try:
         print("尝试使用 NASA POWER API (safe allowlist)...")
@@ -126,17 +101,16 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
             "ALLSKY_SFC_SW_DWN", "CLRSKY_SFC_SW_DWN", "TOA_SW_DWN"
         ]
 
-        # 分批函数
         def _chunks(seq, size):
             for i in range(0, len(seq), size):
                 yield seq[i:i+size]
 
         df_final = None
-        # 先从 RE 社区拿（RE 覆盖面最好）
+        # 优先 AG，其次 RE、SB
         communities = ["AG", "RE", "SB"]
 
         for comm in communities:
-            # 统一大写、去重（保序）
+            # 统一大写、保序去重
             seen = set()
             params_list = [p for p in (s.strip().upper() for s in SAFE_DAILY_PARAMS) if p and not (p in seen or seen.add(p))]
 
@@ -167,6 +141,7 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
                 data = resp.json()
                 if "properties" not in data or "parameter" not in data["properties"]:
                     continue
+
                 # 返回键统一为大写
                 pmap = {str(k).strip().upper(): v for k, v in data["properties"]["parameter"].items()}
 
@@ -208,63 +183,27 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         if df_final is None or df_final.empty:
             return None
 
-        # 单位：Kelvin 时把 T2M 家族改为 K
+        # 单位：Kelvin 时只转换 T2M, T2M_MAX, T2M_MIN；不转换 T2M_RANGE（温差）
         if unit.upper() == "K":
-            temp_keys = ["T2M", "T2M_MAX", "T2M_MIN"]  # do NOT convert T2M_RANGE (daily delta)
-            for key in temp_keys:
+            for key in ["T2M", "T2M_MAX", "T2M_MIN"]:
                 if key in df_final.columns:
-                    s = pd.to_numeric(df_final[key], errors='coerce')
-                    s = s.replace([np.inf, -np.inf], np.nan)
+                    s = pd.to_numeric(df_final[key], errors='coerce').replace([np.inf, -np.inf], np.nan)
                     df_final[key] = s + 273.15
             df_final["unit"] = "K"
         else:
             df_final["unit"] = "C"
 
-        # 列顺序：date 在前
+        # 列顺序：date 在前；随后统一列名
         other_cols = [c for c in df_final.columns if c != "date"]
         df_final = df_final[["date"] + other_cols]
-        # 统一列名到友好格式，便于与预测 CSV 对齐
         df_final = standardize_weather_columns(df_final)
         return df_final
     except Exception as e:
         print(f"NASA POWER 错误: {e}")
         return None
 
-# -------------------- API: Open-Meteo --------------------
-def get_weather_open_meteo(lat, lon, start_date, end_date):
-    try:
-        print("尝试使用 Open-Meteo API...")
-        url = "https://archive-api.open-meteo.com/v1/archive"
-        params = {
-            "latitude": lat,
-            "longitude": lon,
-            "start_date": start_date,
-            "end_date": end_date,
-            "daily": "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,shortwave_radiation_sum",
-            "timezone": "auto"
-        }
-        resp = requests.get(url, params=params, timeout=10)
-        print("Open-Meteo 返回原始响应：", resp.text)
-        print("HTTP 状态码：", resp.status_code)
-        data = resp.json()
-        if "daily" not in data:
-            return None
-        df = pd.DataFrame({
-            "date": data["daily"]["time"],
-            "t_max": data["daily"]["temperature_2m_max"],
-            "t_min": data["daily"]["temperature_2m_min"],
-            "t_avg": data["daily"]["temperature_2m_mean"],
-            "precip": data["daily"]["precipitation_sum"],
-            "solar_rad": data["daily"]["shortwave_radiation_sum"]
-        })
-        df = df[["date", "t_max", "t_min", "t_avg", "precip", "solar_rad"]]
-        df = standardize_weather_columns(df)
-        return df
-    except Exception as e:
-        print(f"Open-Meteo 错误: {e}")
-        return None
+# -------------------- 仅保留 NASA --------------------
 
-# -------------------- 自动切换 API --------------------
 def get_weather_data(lat, lon, start_date, end_date, unit="C"):
     df = get_weather_nasa_power(lat, lon, start_date, end_date, unit)
     if df is not None and not df.empty:
@@ -273,12 +212,7 @@ def get_weather_data(lat, lon, start_date, end_date, unit="C"):
     # 明确失败：仅保留 NASA 调用
     raise Exception("NASA 数据获取失败")
 
-
-
 # -------------------- 评估与绘图工具函数 --------------------
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 def evaluate_and_plot_predictions(y_true, y_pred, field_name):
     """裁剪长度一致，计算 MAE/RMSE/R² 并画拟合图"""
@@ -300,7 +234,7 @@ def evaluate_and_plot_predictions(y_true, y_pred, field_name):
     st.markdown(f"**RMSE**: {rmse:.3f}")
     st.markdown(f"**R²**: {r2:.3f}")
 
-    # 折线图（原来的）
+    # 折线图
     fig1, ax1 = plt.subplots()
     ax1.plot(getattr(y_true, "values", y_true), label="Actual", linewidth=1.5)
     ax1.plot(getattr(y_pred, "values", y_pred), "--", label="Predicted", linewidth=1.5)
