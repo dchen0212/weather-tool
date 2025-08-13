@@ -87,6 +87,16 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
                     continue
                 pmap = data["properties"]["parameter"]  # {PARAM: {date: value}}
 
+                # 一些参数在该社区/时间/地点可能完全缺失，NASA 直接不返回键；记录并占位
+                requested_params = list(pmap.keys())
+                # 但我们需要用当前请求的 batch 列表，而不是 pmap.keys()
+                requested_params = batch
+                missing_params = [p for p in requested_params if p not in pmap]
+                if missing_params:
+                    print(f"⚠️ 缺失参数（社区 {comm}，本批）: {missing_params}")
+                    for mp in missing_params:
+                        pmap[mp] = {}
+
                 # 收集本批所有日期
                 dates = set()
                 for series in pmap.values():
@@ -100,7 +110,7 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
                 rows = []
                 for d in dates:
                     row = {"date": d}
-                    for p in pmap.keys():
+                    for p in requested_params:
                         v = pmap.get(p, {}).get(d, None)
                         row[p] = v
                     rows.append(row)
