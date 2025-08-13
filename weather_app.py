@@ -28,6 +28,9 @@ end_date = st.date_input("End Date", value=datetime(2015, 12, 31))
 unit = st.radio("Temperature Unit", ["Celsius (°C)", "Kelvin (K)"])
 unit_code = "C" if "Celsius" in unit else "K"
 
+# Data source note
+st.info("Data source: **NASA POWER** (Prediction Of Worldwide Energy Resources) — provides global meteorological and solar radiation data.")
+
 # 按钮触发
 if st.button("Get Weather Data"):
     if start_date > end_date:
@@ -35,8 +38,12 @@ if st.button("Get Weather Data"):
     else:
         with st.spinner("Fetching data, please wait..."):
             try:
+                progress_bar = st.progress(0)
+                progress_bar.progress(10)
                 df = get_weather_data(lat, lon, str(start_date), str(end_date), unit=unit_code)
+                progress_bar.progress(50)
                 if df is not None and not df.empty:
+                    progress_bar.progress(100)
                     st.success("✅ Success!")
                     st.dataframe(df)
 
