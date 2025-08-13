@@ -55,63 +55,79 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         end_fmt = end_date.replace("-", "")
         url = "https://power.larc.nasa.gov/api/temporal/daily/point"
 
-        # 1) 获取完整参数清单
-        all_params = _get_nasa_daily_parameter_list(community="RE")
-        if not all_params:
-            return None
+        # 我们同时尝试多个社区以拿到更全的日尺度参数
+        communities = ["RE", "AG", "SB"]
 
-        # 2) 分批请求，避免 URL 过长（每批 35 个参数较稳妥）
         def _chunks(seq, size):
             for i in range(0, len(seq), size):
                 yield seq[i:i+size]
 
         df_final = None
-        for batch in _chunks(all_params, 35):
-            params_str = ",".join(batch)
-            q = {
-                "start": start_fmt,
-                "end": end_fmt,
-                "latitude": lat,
-                "longitude": lon,
-                "parameters": params_str,
-                "format": "JSON",
-                "community": "RE"
-            }
-            resp = requests.get(url, params=q, timeout=20)
-            print("POWER 批次响应预览：", resp.text[:400])
-            data = resp.json()
-            if "properties" not in data or "parameter" not in data["properties"]:
+        for comm in communities:
+            all_params = _get_nasa_daily_parameter_list(community=comm)
+            if not all_params:
                 continue
-            pmap = data["properties"]["parameter"]  # {PARAM: {date: value}}
-            # 收集本批所有日期
-            dates = set()
-            for series in pmap.values():
-                if isinstance(series, dict):
-                    dates.update(series.keys())
-            if not dates:
+
+            df_comm = None
+            for batch in _chunks(all_params, 35):  # 控制每批参数数量，避免 URL 过长
+                params_str = ",".join(batch)
+                q = {
+                    "start": start_fmt,
+                    "end": end_fmt,
+                    "latitude": lat,
+                    "longitude": lon,
+                    "parameters": params_str,
+                    "format": "JSON",
+                    "community": comm
+                }
+                resp = requests.get(url, params=q, timeout=20)
+                print(f"POWER 社区 {comm} 批次响应预览：", resp.text[:400])
+                data = resp.json()
+                if "properties" not in data or "parameter" not in data["properties"]:
+                    continue
+                pmap = data["properties"]["parameter"]  # {PARAM: {date: value}}
+
+                # 收集本批所有日期
+                dates = set()
+                for series in pmap.values():
+                    if isinstance(series, dict):
+                        dates.update(series.keys())
+                if not dates:
+                    continue
+                dates = sorted(dates)
+
+                # 构建本批 DataFrame
+                rows = []
+                for d in dates:
+                    row = {"date": d}
+                    for p in pmap.keys():
+                        v = pmap.get(p, {}).get(d, None)
+                        row[p] = v
+                    rows.append(row)
+                df_batch = pd.DataFrame(rows)
+
+                if df_comm is None:
+                    df_comm = df_batch
+                else:
+                    # 合并到该社区的累计表
+                    df_comm = pd.merge(df_comm, df_batch, on="date", how="outer")
+
+            if df_comm is None:
                 continue
-            dates = sorted(dates)
 
-            # 构建本批 DataFrame
-            rows = []
-            for d in dates:
-                row = {"date": d}
-                for p in pmap.keys():
-                    v = pmap.get(p, {}).get(d, None)
-                    row[p] = v
-                rows.append(row)
-            df_batch = pd.DataFrame(rows)
-
-            # 合并到最终结果
+            # 与总表合并，去除重复列（保留已有列）
             if df_final is None:
-                df_final = df_batch
+                df_final = df_comm
             else:
-                df_final = pd.merge(df_final, df_batch, on="date", how="outer")
+                dup_cols = list(set(df_comm.columns) & set(df_final.columns) - {"date"})
+                if dup_cols:
+                    df_comm = df_comm.drop(columns=dup_cols)
+                df_final = pd.merge(df_final, df_comm, on="date", how="outer")
 
         if df_final is None or df_final.empty:
             return None
 
-        # 3) 单位处理：如需 Kelvin，则把所有 T2M 家族（前缀匹配）的字段 C->K
+        # 单位处理：如需 Kelvin，把所有 T2M* 字段 C->K
         if unit.upper() == "K":
             for col in list(df_final.columns):
                 if col.upper().startswith("T2M"):
@@ -121,7 +137,7 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         else:
             df_final["unit"] = "C"
 
-        # 4) 排序列：date 在前
+        # 排序列：date 在前
         other_cols = [c for c in df_final.columns if c != "date"]
         df_final = df_final[["date"] + other_cols]
         return df_final
