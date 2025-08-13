@@ -266,20 +266,12 @@ def get_weather_open_meteo(lat, lon, start_date, end_date):
 
 # -------------------- 自动切换 API --------------------
 def get_weather_data(lat, lon, start_date, end_date, unit="C"):
-    apis = [
-        get_weather_nasa_power,
-        get_weather_open_meteo,
-    ]
-    for api_func in apis:
-        if api_func == get_weather_nasa_power:
-            df = api_func(lat, lon, start_date, end_date, unit)
-        else:
-            df = api_func(lat, lon, start_date, end_date)
-        if df is not None and not df.empty:
-            print(f"✅ 成功使用 {api_func.__name__} 数据源")
-            return df
-
-    raise Exception("❌ 所有数据源都无法获取数据")
+    df = get_weather_nasa_power(lat, lon, start_date, end_date, unit)
+    if df is not None and not df.empty:
+        print("✅ 成功使用 get_weather_nasa_power 数据源")
+        return df
+    # 明确失败：仅保留 NASA 调用
+    raise Exception("NASA 数据获取失败")
 
 
 
