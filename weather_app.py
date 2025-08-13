@@ -122,7 +122,6 @@ example_df = pd.DataFrame({
 })
 st.caption("Example CSV (first rows)")
 st.dataframe(example_df)
-render_param_glossary()
 
 # Downloadable CSV template
 template_csv = example_df.to_csv(index=False).encode("utf-8")
