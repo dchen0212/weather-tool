@@ -92,8 +92,8 @@ if real_file and pred_file:
 
         # 自动检测可对比的公共字段（包括温度、降水、光照等）
         compare_fields = [col for col in df_real.columns if col in df_pred.columns]
-        # 移除无意义字段如日期字段
-        compare_fields = [col for col in compare_fields if col.lower() != 'date']
+        # 移除无意义字段如日期、单位等非数值字段
+        compare_fields = [col for col in compare_fields if col.lower() not in ['date', 'unit']]
 
         if not compare_fields:
             st.error("❌ No common fields found for comparison")
