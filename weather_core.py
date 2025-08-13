@@ -15,24 +15,58 @@ def read_csv_with_encoding_detection(file_obj):
     except Exception as e:
         raise ValueError(f"读取失败，尝试使用编码 {encoding}，错误：{e}")
 
+# -------------------- NASA POWER 参数列表获取 --------------------
+def _get_nasa_daily_parameter_list(community="RE"):
+    """获取 NASA POWER 可用的每日参数列表"""
+    metadata_urls = [
+        "https://power.larc.nasa.gov/api/metadata/parameter-names",
+        "https://power.larc.nasa.gov/api/temporal/daily/point?community={}&parameters=ALL&format=JSON".format(community),
+    ]
+    for url in metadata_urls:
+        try:
+            resp = requests.get(url, timeout=20)
+            if resp.status_code == 200:
+                data = resp.json()
+                # 尝试解析参数列表
+                if "parameters" in data:
+                    # 可能是参数元数据接口
+                    params = list(data["parameters"].keys())
+                    if params:
+                        return params
+                elif "properties" in data and "parameter" in data["properties"]:
+                    # 可能是示例数据接口，取参数键
+                    params = list(data["properties"]["parameter"].keys())
+                    if params:
+                        return params
+        except Exception:
+            continue
+    # 如果都失败，返回一个安全的最小参数集
+    return [
+        "T2M", "T2M_MAX", "T2M_MIN",
+        "PRECTOT", "ALLSKY_SFC_SW_DWN"
+    ]
+
 # -------------------- API 3: NASA POWER --------------------
 def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
     try:
         print("尝试使用 NASA POWER API...")
         start_fmt = start_date.replace("-", "")
         end_fmt = end_date.replace("-", "")
+        params_list = _get_nasa_daily_parameter_list()
+        # 参数字符串
+        parameters = ",".join(params_list)
         url = "https://power.larc.nasa.gov/api/temporal/daily/point"
         params = {
             "start": start_fmt,
             "end": end_fmt,
             "latitude": lat,
             "longitude": lon,
-            "parameters": "ALL",
+            "parameters": parameters,
             "format": "JSON",
             "community": "RE"
         }
-        resp = requests.get(url, params=params, timeout=10)
-        print("NASA POWER 原始响应：", resp.text)
+        resp = requests.get(url, params=params, timeout=20)
+        print("NASA POWER 原始响应前500字符：", resp.text[:500])
         print("HTTP 状态码：", resp.status_code)
         data = resp.json()
         if "properties" not in data or "parameter" not in data["properties"]:
@@ -50,6 +84,9 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
             records.append(record)
 
         df = pd.DataFrame(records)
+        # Reorder columns: date first, then all parameters
+        cols = ["date"] + [c for c in df.columns if c != "date"]
+        df = df[cols]
 
         if unit.upper() == "K":
             for temp_key in ["t2m_max", "t2m_min", "t2m"]:
