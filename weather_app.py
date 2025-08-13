@@ -19,6 +19,45 @@ st.set_page_config(page_title="Weather data acquisition and analysis", layout="c
 
 st.title("🌤️ Weather data acquisition and analysis")
 
+# --- Helper: parameter glossary ---
+def render_param_glossary():
+    with st.expander("ℹ️ Parameter glossary (click to expand)"):
+        st.markdown(
+            """
+            **date** — Calendar date (YYYY/MM/DD in exports)
+
+            **t_max** — Daily maximum 2 m air temperature.
+
+            **t_min** — Daily minimum 2 m air temperature.
+
+            **t_avg** — Daily mean 2 m air temperature.
+
+            **t_range** — Daily temperature range (t_max − t_min).
+
+            **precip** — Total daily precipitation.
+
+            **solar_rad** — All-sky surface shortwave downwelling radiation (daily total at surface).
+
+            **clrsky_solar_rad** — Clear-sky surface shortwave downwelling radiation (no cloud effect).
+
+            **toa_solar_rad** — Top-of-atmosphere shortwave downwelling radiation (daily total above atmosphere).
+
+            **rel_humidity** — 2 m relative humidity.
+
+            **spec_humidity** — 2 m specific humidity.
+
+            **wind_speed_10m** — Wind speed at 10 m above surface.
+
+            **wind_speed_50m** — Wind speed at 50 m above surface.
+
+            **wind_direction_10m** — Wind direction at 10 m (degrees from north, meteorological convention).
+
+            **surface_pressure** — Surface air pressure.
+
+            *Note:* Temperature columns (`t_*`) use the unit you selected above (Celsius/Kelvin). Other variables follow the original provider units from NASA POWER/Open-Meteo.
+            """
+        )
+
 # 输入经纬度和日期范围
 lat = st.number_input("Latitude", value=32.0, format="%.6f")
 lon = st.number_input("Longitude", value=-84.0, format="%.6f")
@@ -46,6 +85,7 @@ if st.button("Get Weather Data"):
                     progress_bar.progress(100)
                     st.success("✅ Success!")
                     st.dataframe(df)
+                    render_param_glossary()
 
                     # 下载链接
                     filename = f"weather_{start_date}_{end_date}_{lat}_{lon}.csv"
@@ -82,6 +122,7 @@ example_df = pd.DataFrame({
 })
 st.caption("Example CSV (first rows)")
 st.dataframe(example_df)
+render_param_glossary()
 
 # Downloadable CSV template
 template_csv = example_df.to_csv(index=False).encode("utf-8")
