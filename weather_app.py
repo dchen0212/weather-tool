@@ -50,12 +50,41 @@ if st.button("Get Weather Data"):
                 st.error(f"❌ Error: {e}")
 
 # --- 真实 vs 预测 CSV 数据对比模块 ---
+st.markdown("---")
+st.header("📊 Real vs Predicted Data Comparison")
+
+# CSV format reminder (inline)
+st.subheader("CSV format reminder")
+st.info(
+    """
+    **Expected columns (example):** `t_max, t_min, t_avg, precip, solar_rad`  
+    • First row must be headers, comma-separated  
+    • Numeric values only (no units in cells)  
+    • Optional `date` column allowed (used only for alignment/preview)  
+    • Real and Predicted CSVs must share the same column names and row count/order
+    """
+)
+
+# Example small table
+example_df = pd.DataFrame({
+    "t_max": [298.51, 299.16, 295.12],
+    "t_min": [287.43, 288.33, 282.39],
+    "t_avg": [291.86, 292.42, 286.52],
+    "precip": [0.04, 3.16, 15.19],
+    "solar_rad": [3.5119, 1.1654, 0.9737]
+})
+st.caption("Example CSV (first rows)")
+st.dataframe(example_df)
+
+# Downloadable CSV template
+template_csv = example_df.to_csv(index=False).encode("utf-8")
+st.download_button("📥 Download CSV template", template_csv, file_name="weather_template.csv", mime="text/csv")
+
 real_file = st.file_uploader("Upload Real Weather CSV", type=["csv"], key="real_file")
 pred_file = st.file_uploader("Upload Predicted Weather CSV", type=["csv"], key="pred_file")
 
 # 只有在 real_file 和 pred_file 都已上传时才进行分析
 if real_file and pred_file:
-    st.header("📊 Real vs Predicted Data Comparison")
     try:
         # 自动检测编码读取
         df_real = read_csv_with_encoding_detection(real_file)
@@ -147,8 +176,8 @@ if real_file and pred_file:
 
                 # 折线图
                 fig, ax = plt.subplots(figsize=(10, 4))
-                ax.plot(y_true.index, y_true, label="真实值")
-                ax.plot(y_pred.index, y_pred, label="预测值", linestyle="--")
+                ax.plot(y_true.index, y_true, label="Actual")
+                ax.plot(y_pred.index, y_pred, label="Predicted", linestyle="--")
                 ax.set_title(f"{target_col} Comparison Line Chart")
                 ax.set_xlabel("Index")
                 ax.set_ylabel(target_col)
