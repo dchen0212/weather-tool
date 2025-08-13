@@ -15,47 +15,47 @@ def read_csv_with_encoding_detection(uploaded_file):
     uploaded_file.seek(0)
     return df
 
-st.set_page_config(page_title="天气数据查询", layout="centered")
+st.set_page_config(page_title="Weather Data Query", layout="centered")
 
-st.title("🌤️ 天气数据查询系统")
+st.title("🌤️ Weather Data Query System")
 
 # 输入经纬度和日期范围
-lat = st.number_input("纬度 (Latitude)", value=32.0, format="%.6f")
-lon = st.number_input("经度 (Longitude)", value=-84.0, format="%.6f")
-start_date = st.date_input("起始日期", value=datetime(2015, 1, 1))
-end_date = st.date_input("结束日期", value=datetime(2015, 12, 31))
+lat = st.number_input("Latitude", value=32.0, format="%.6f")
+lon = st.number_input("Longitude", value=-84.0, format="%.6f")
+start_date = st.date_input("Start Date", value=datetime(2015, 1, 1))
+end_date = st.date_input("End Date", value=datetime(2015, 12, 31))
 
-unit = st.radio("温度单位", ["摄氏度 (°C)", "开尔文 (K)"])
-unit_code = "C" if "摄氏" in unit else "K"
+unit = st.radio("Temperature Unit", ["Celsius (°C)", "Kelvin (K)"])
+unit_code = "C" if "Celsius" in unit else "K"
 
 # 按钮触发
-if st.button("获取天气数据"):
+if st.button("Get Weather Data"):
     if start_date > end_date:
-        st.error("❌ 起始日期不能晚于结束日期")
+        st.error("❌ Start date cannot be later than end date")
     else:
-        with st.spinner("正在获取数据，请稍候..."):
+        with st.spinner("Fetching data, please wait..."):
             try:
                 df = get_weather_data(lat, lon, str(start_date), str(end_date), unit=unit_code)
                 if df is not None and not df.empty:
-                    st.success("✅ 获取成功！")
+                    st.success("✅ Success!")
                     st.dataframe(df)
 
                     # 下载链接
                     filename = f"weather_{start_date}_{end_date}_{lat}_{lon}.csv"
                     csv = df.to_csv(index=False).encode("utf-8")
-                    st.download_button("📥 下载 CSV 文件", csv, file_name=filename, mime="text/csv")
+                    st.download_button("📥 Download CSV", csv, file_name=filename, mime="text/csv")
                 else:
-                    st.warning("⚠️ 没有获取到有效数据。")
+                    st.warning("⚠️ No valid data retrieved.")
             except Exception as e:
-                st.error(f"❌ 出错：{e}")
+                st.error(f"❌ Error: {e}")
 
 # --- 真实 vs 预测 CSV 数据对比模块 ---
-real_file = st.file_uploader("上传真实天气 CSV 文件", type=["csv"], key="real_file")
-pred_file = st.file_uploader("上传预测天气 CSV 文件", type=["csv"], key="pred_file")
+real_file = st.file_uploader("Upload Real Weather CSV", type=["csv"], key="real_file")
+pred_file = st.file_uploader("Upload Predicted Weather CSV", type=["csv"], key="pred_file")
 
 # 只有在 real_file 和 pred_file 都已上传时才进行分析
 if real_file and pred_file:
-    st.header("📊 真实 vs 预测数据对比分析")
+    st.header("📊 Real vs Predicted Data Comparison")
     try:
         # 自动检测编码读取
         df_real = read_csv_with_encoding_detection(real_file)
@@ -67,20 +67,20 @@ if real_file and pred_file:
         compare_fields = [col for col in compare_fields if col.lower() != 'date']
 
         if not compare_fields:
-            st.error("❌ 未找到两个文件中共有的对比字段")
+            st.error("❌ No common fields found for comparison")
         else:
-            target_col = st.selectbox("请选择对比字段：", compare_fields)
+            target_col = st.selectbox("Select field to compare:", compare_fields)
             if target_col.lower() == "date":
-                st.warning("⚠️ 字段 'date' 为时间字段，不进行误差计算与绘图。")
+                st.warning("⚠️ The 'date' field is a time field; no error metrics or plots will be generated.")
             else:
                 y_true = df_real[target_col].reset_index(drop=True)
                 y_pred = df_pred[target_col].reset_index(drop=True)
 
                 # 数据预览（前10行）
-                st.subheader("📌 数据预览 (前10行)")
+                st.subheader("📌 Preview (first 10 rows)")
                 st.dataframe(pd.DataFrame({
-                    "真实值": y_true.head(10),
-                    "预测值": y_pred.head(10)
+                    "Actual": y_true.head(10),
+                    "Predicted": y_pred.head(10)
                 }))
 
                 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -109,20 +109,14 @@ if real_file and pred_file:
                 ae = np.abs(y_true - y_pred)
                 error = y_pred - y_true
 
-                interval = st.selectbox("选择时间尺度", ["每周", "每两周", "每月"], key="interval_select")
+                interval = st.selectbox("Select time scale", ["Weekly", "Biweekly", "Monthly"], key="interval_select")
+                interval_en = interval
 
-                interval_map = {
-                    "每周": "Weekly",
-                    "每两周": "Biweekly",
-                    "每月": "Monthly"
-                }
-                interval_en = interval_map[interval]
-
-                if interval == "每周":
+                if interval == "Weekly":
                     mae_vals = weekly_mae
                     rmse_vals = weekly_rmse
                     r2_vals = weekly_r2
-                elif interval == "每两周":
+                elif interval == "Biweekly":
                     mae_vals = biweekly_mae
                     rmse_vals = biweekly_rmse
                     r2_vals = biweekly_r2
@@ -131,7 +125,7 @@ if real_file and pred_file:
                     rmse_vals = monthly_rmse
                     r2_vals = monthly_r2
 
-                with st.expander("📊 查看详细误差信息"):
+                with st.expander("📊 Detailed Error Metrics"):
                     st.subheader(f"{interval} MAE")
                     st.dataframe(pd.DataFrame({"Interval": list(range(1, len(mae_vals)+1)), "MAE": mae_vals}))
 
@@ -141,10 +135,10 @@ if real_file and pred_file:
                     st.subheader(f"{interval} R²")
                     st.dataframe(pd.DataFrame({"Interval": list(range(1, len(r2_vals)+1)), "R²": r2_vals}))
 
-                    st.subheader("前10个绝对误差 (AE)")
+                    st.subheader("Top 10 Absolute Errors (AE)")
                     st.dataframe(ae.head(10))
 
-                    st.subheader("前10个误差 (Error)")
+                    st.subheader("Top 10 Errors (Error)")
                     st.dataframe(error.head(10))
 
                 st.write(f"**MAE**: {mae:.3f}")
@@ -194,4 +188,4 @@ if real_file and pred_file:
                 ax5.legend()
                 st.pyplot(fig5)
     except Exception as e:
-        st.error(f"❌ 对比出错：{e}")
+        st.error(f"❌ Comparison error: {e}")
