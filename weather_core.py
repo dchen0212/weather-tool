@@ -50,27 +50,39 @@ def _get_nasa_daily_parameter_list(community="RE"):
 # -------------------- API 3: NASA POWER --------------------
 def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
     try:
-        print("尝试使用 NASA POWER API...")
+        print("尝试使用 NASA POWER API (safe allowlist)...")
         start_fmt = start_date.replace("-", "")
         end_fmt = end_date.replace("-", "")
         url = "https://power.larc.nasa.gov/api/temporal/daily/point"
 
-        # 我们同时尝试多个社区以拿到更全的日尺度参数
-        communities = ["RE", "AG", "SB"]
+        # ✅ 稳妥白名单（常见、日尺度可用；只保留 PRECTOTCORR，避免与 PRECTOT 冲突；不包含 SNOWC）
+        SAFE_DAILY_PARAMS = [
+            "T2M", "T2M_MAX", "T2M_MIN", "T2M_RANGE",
+            "RH2M", "QV2M",
+            "WS10M", "WS50M", "WD10M",
+            "PS",
+            "PRECTOTCORR",
+            "ALLSKY_SFC_SW_DWN", "CLRSKY_SFC_SW_DWN", "TOA_SW_DWN"
+        ]
 
+        # 分批函数
         def _chunks(seq, size):
             for i in range(0, len(seq), size):
                 yield seq[i:i+size]
 
         df_final = None
+        # 先从 RE 社区拿（RE 覆盖面最好）
+        communities = ["AG", "RE", "SB"]
+
         for comm in communities:
-            all_params = _get_nasa_daily_parameter_list(community=comm)
-            if not all_params:
-                continue
+            # 统一大写、去重（保序）
+            seen = set()
+            params_list = [p for p in (s.strip().upper() for s in SAFE_DAILY_PARAMS) if p and not (p in seen or seen.add(p))]
 
             df_comm = None
-            for batch in _chunks(all_params, 35):  # 控制每批参数数量，避免 URL 过长
+            for batch in _chunks(params_list, 20):
                 params_str = ",".join(batch)
+                print(f"提交社区 {comm} 参数批次（前10个）: {batch[:10]}")
                 q = {
                     "start": start_fmt,
                     "end": end_fmt,
@@ -81,23 +93,23 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
                     "community": comm
                 }
                 resp = requests.get(url, params=q, timeout=20)
-                print(f"POWER 社区 {comm} 批次响应预览：", resp.text[:400])
+
+                # 如果服务返回错误头，跳过该批次
+                try:
+                    data_preview = resp.json()
+                    if isinstance(data_preview, dict) and str(data_preview.get("header", "")).startswith("The POWER Daily API failed"):
+                        print("❌ POWER 批次失败：", data_preview.get("messages", data_preview))
+                        continue
+                except Exception:
+                    pass
+
                 data = resp.json()
                 if "properties" not in data or "parameter" not in data["properties"]:
                     continue
-                pmap = data["properties"]["parameter"]  # {PARAM: {date: value}}
+                # 返回键统一为大写
+                pmap = {str(k).strip().upper(): v for k, v in data["properties"]["parameter"].items()}
 
-                # 一些参数在该社区/时间/地点可能完全缺失，NASA 直接不返回键；记录并占位
-                requested_params = list(pmap.keys())
-                # 但我们需要用当前请求的 batch 列表，而不是 pmap.keys()
-                requested_params = batch
-                missing_params = [p for p in requested_params if p not in pmap]
-                if missing_params:
-                    print(f"⚠️ 缺失参数（社区 {comm}，本批）: {missing_params}")
-                    for mp in missing_params:
-                        pmap[mp] = {}
-
-                # 收集本批所有日期
+                # 本批所有日期
                 dates = set()
                 for series in pmap.values():
                     if isinstance(series, dict):
@@ -106,11 +118,11 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
                     continue
                 dates = sorted(dates)
 
-                # 构建本批 DataFrame
+                # 行构建（确保所有请求参数都有列；缺失的填 None）
                 rows = []
                 for d in dates:
                     row = {"date": d}
-                    for p in requested_params:
+                    for p in batch:
                         v = pmap.get(p, {}).get(d, None)
                         row[p] = v
                     rows.append(row)
@@ -119,13 +131,11 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
                 if df_comm is None:
                     df_comm = df_batch
                 else:
-                    # 合并到该社区的累计表
                     df_comm = pd.merge(df_comm, df_batch, on="date", how="outer")
 
             if df_comm is None:
                 continue
 
-            # 与总表合并，去除重复列（保留已有列）
             if df_final is None:
                 df_final = df_comm
             else:
@@ -137,7 +147,7 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         if df_final is None or df_final.empty:
             return None
 
-        # 单位处理：如需 Kelvin，把所有 T2M* 字段 C->K
+        # 单位：Kelvin 时把 T2M 家族改为 K
         if unit.upper() == "K":
             for col in list(df_final.columns):
                 if col.upper().startswith("T2M"):
@@ -147,7 +157,7 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         else:
             df_final["unit"] = "C"
 
-        # 排序列：date 在前
+        # 列顺序：date 在前
         other_cols = [c for c in df_final.columns if c != "date"]
         df_final = df_final[["date"] + other_cols]
         return df_final
@@ -234,9 +244,9 @@ def evaluate_and_plot_predictions(y_true, y_pred, field_name):
 
     # 折线图（原来的）
     fig1, ax1 = plt.subplots()
-    ax1.plot(getattr(y_true, "values", y_true), label="真实值", linewidth=1.5)
-    ax1.plot(getattr(y_pred, "values", y_pred), "--", label="预测值", linewidth=1.5)
-    ax1.set_title(f"{field_name} 时间序列对比")
+    ax1.plot(getattr(y_true, "values", y_true), label="Actual", linewidth=1.5)
+    ax1.plot(getattr(y_pred, "values", y_pred), "--", label="Predicted", linewidth=1.5)
+    ax1.set_title(f"{field_name} time series comparison")
     ax1.legend()
     st.pyplot(fig1)
 
@@ -245,9 +255,9 @@ def evaluate_and_plot_predictions(y_true, y_pred, field_name):
     ax2.scatter(y_true, y_pred, s=10, alpha=0.6)
     z = np.polyfit(y_true, y_pred, 1)
     p = np.poly1d(z)
-    ax2.plot(y_true, p(y_true), "r--", label="拟合线")
-    ax2.set_xlabel("真实值")
-    ax2.set_ylabel("预测值")
-    ax2.set_title(f"{field_name} 拟合图")
+    ax2.plot(y_true, p(y_true), "r--", label="Best fit line")
+    ax2.set_xlabel("Actual")
+    ax2.set_ylabel("Predicted")
+    ax2.set_title(f"{field_name} fit plot")
     ax2.legend()
     st.pyplot(fig2)
