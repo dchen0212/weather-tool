@@ -27,7 +27,7 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
             "end": end_fmt,
             "latitude": lat,
             "longitude": lon,
-            "parameters": "T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,ALLSKY_SFC_SW_DWN",
+            "parameters": "ALL",
             "format": "JSON",
             "community": "RE"
         }
@@ -38,26 +38,23 @@ def get_weather_nasa_power(lat, lon, start_date, end_date, unit="C"):
         if "properties" not in data or "parameter" not in data["properties"]:
             print("NASA POWER 返回数据格式异常")
             return None
-        t_avg = data["properties"]["parameter"].get("T2M", {})
-        t_max = data["properties"]["parameter"].get("T2M_MAX", {})
-        t_min = data["properties"]["parameter"].get("T2M_MIN", {})
 
+        parameters = data["properties"]["parameter"]
+        # Use dates from one of the parameters as base
+        any_param = next(iter(parameters.values()))
         records = []
-        for date in t_avg:
-            records.append({
-                "date": date,
-                "t_max": t_max.get(date),
-                "t_min": t_min.get(date),
-                "t_avg": t_avg.get(date),
-                "precip": data["properties"]["parameter"].get("PRECTOTCORR", {}).get(date),
-                "solar_rad": data["properties"]["parameter"].get("ALLSKY_SFC_SW_DWN", {}).get(date),
-            })
+        for date in any_param:
+            record = {"date": date}
+            for param_key, param_values in parameters.items():
+                record[param_key.lower()] = param_values.get(date)
+            records.append(record)
+
         df = pd.DataFrame(records)
-        df = df[["date", "t_max", "t_min", "t_avg", "precip", "solar_rad"]]
+
         if unit.upper() == "K":
-            df["t_max"] = df["t_max"] + 273.15
-            df["t_min"] = df["t_min"] + 273.15
-            df["t_avg"] = df["t_avg"] + 273.15
+            for temp_key in ["t2m_max", "t2m_min", "t2m"]:
+                if temp_key in df.columns:
+                    df[temp_key] = df[temp_key] + 273.15
             df["unit"] = "K"
         else:
             df["unit"] = "C"
