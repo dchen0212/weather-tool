@@ -1,10 +1,6 @@
 name: Build Windows EXE
-  run: |
-    pyinstaller --onefile --noconsole --name WeatherTool app.py ^
-      --collect-all streamlit ^
-      --copy-metadata streamlit ^
-      --collect-all altair ^
-      --copy-metadata altairon:
+
+on:
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -24,21 +20,24 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # === 新增：打包源码为 zip（排除常见大目录） ===
+      # 可选：打一个源码包
       - name: Archive source (zip)
         run: |
           git archive --format=zip --output weather_tool_source.zip HEAD -- . ":(exclude)dist" ":(exclude)build" ":(exclude).venv" ":(exclude)__pycache__" ":(exclude).idea" ":(exclude).DS_Store" ":(exclude)WeatherTool.spec"
-
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
           name: weather-tool-source
           path: weather_tool_source.zip
 
-      # === 继续打包 exe ===
       - name: Build EXE
+        shell: cmd
         run: |
-          pyinstaller --onefile --noconsole --name WeatherTool app.py
+          pyinstaller --onefile --noconsole --name WeatherTool app.py ^
+            --collect-all streamlit ^
+            --copy-metadata streamlit ^
+            --collect-all altair ^
+            --copy-metadata altair
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
