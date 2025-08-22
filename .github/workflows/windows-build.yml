@@ -1,6 +1,10 @@
 name: Build Windows EXE
-
-on:
+  run: |
+    pyinstaller --onefile --noconsole --name WeatherTool app.py ^
+      --collect-all streamlit ^
+      --copy-metadata streamlit ^
+      --collect-all altair ^
+      --copy-metadata altairon:
   push:
     branches: [ main ]
   workflow_dispatch:
