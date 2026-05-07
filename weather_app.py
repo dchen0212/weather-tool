@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from weather_agent import build_agent_plan, summarize_plan
 from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py
 
 # 自动检测编码读取 CSV 文件
@@ -18,6 +19,36 @@ def read_csv_with_encoding_detection(uploaded_file):
 st.set_page_config(page_title="Weather data acquisition and analysis", layout="centered")
 
 st.title("🌤️ Weather data acquisition and analysis")
+
+st.subheader("🤖 Weather Agent")
+agent_prompt = st.text_area(
+    "Describe the task in plain language",
+    placeholder="Example: Fetch weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius.",
+    height=110,
+)
+
+if st.button("Run Agent Plan"):
+    plan = build_agent_plan(agent_prompt)
+    st.markdown("**Agent Plan**")
+    st.json(summarize_plan(plan))
+
+    if plan.intent == "fetch_weather" and not plan.missing:
+        with st.spinner("Agent is fetching weather data..."):
+            try:
+                df = get_weather_data(plan.lat, plan.lon, plan.start_date, plan.end_date, unit=plan.unit)
+                st.success("✅ Agent completed the weather retrieval task.")
+                st.dataframe(df)
+                filename = f"agent_weather_{plan.start_date}_{plan.end_date}_{plan.lat}_{plan.lon}.csv"
+                csv = df.to_csv(index=False).encode("utf-8")
+                st.download_button("📥 Download Agent Result CSV", csv, file_name=filename, mime="text/csv")
+            except Exception as e:
+                st.error(f"❌ Agent failed: {e}")
+    elif plan.intent == "compare_predictions":
+        st.info("Upload the real and predicted CSV files below, then use the comparison section to finish the task.")
+    else:
+        st.warning("The agent needs more structured details before it can execute the task.")
+
+st.markdown("---")
 
 # --- Helper: parameter glossary ---
 def render_param_glossary():

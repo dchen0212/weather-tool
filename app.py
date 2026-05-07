@@ -12,7 +12,20 @@ def launch_streamlit():
 def run_cli(args):
     import pandas as pd
 
+    from weather_agent import build_agent_plan
     from weather_core import get_weather_data, standardize_weather_columns
+
+    if args.prompt:
+        plan = build_agent_plan(args.prompt)
+        if plan.intent != "fetch_weather":
+            raise SystemExit("Prompt mode in CLI currently supports weather retrieval requests only.")
+        if plan.missing:
+            raise SystemExit(f"Prompt is missing required fields: {', '.join(plan.missing)}")
+        args.lat = plan.lat
+        args.lon = plan.lon
+        args.start = plan.start_date
+        args.end = plan.end_date
+        args.unit = plan.unit
 
     df = get_weather_data(args.lat, args.lon, args.start, args.end, args.unit)
     if df is None or df.empty:
@@ -37,6 +50,7 @@ def build_parser():
     parser.add_argument("--end", type=str, help="End date in YYYY-MM-DD")
     parser.add_argument("--unit", type=str, default="C", choices=["C", "K"], help="Temperature unit")
     parser.add_argument("--out", type=str, default="weather.csv", help="Output CSV filename")
+    parser.add_argument("--prompt", type=str, help="Natural-language weather task, for example: fetch weather for lat 32 lon -84 from 2015-01-01 to 2015-12-31")
     return parser
 
 
@@ -44,7 +58,7 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    cli_fields = [args.lat, args.lon, args.start, args.end]
+    cli_fields = [args.lat, args.lon, args.start, args.end, args.prompt]
     has_cli_args = any(value is not None for value in cli_fields)
 
     if args.gui or not has_cli_args:
@@ -52,6 +66,10 @@ def main():
         return
 
     missing = []
+    if args.prompt:
+        run_cli(args)
+        return
+
     if args.lat is None:
         missing.append("--lat")
     if args.lon is None:

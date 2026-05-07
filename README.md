@@ -11,6 +11,8 @@ A weather-data tool that supports both a `Streamlit` graphical interface and com
   Fetch daily weather data by latitude, longitude, and date range
 - 支持图形界面与命令行两种使用方式  
   Support both graphical and command-line usage
+- 支持轻量级自然语言 weather agent，用于任务解析与自动执行  
+  Support a lightweight natural-language weather agent for task parsing and execution
 - 支持摄氏度与开尔文两种温度单位  
   Support both Celsius and Kelvin temperature units
 - 自动标准化常见天气字段名，便于建模或对比分析  
@@ -35,6 +37,31 @@ This project now has two usage modes:
   GUI mode: launch the `Streamlit` interface for interactive use
 - CLI 模式：通过命令行参数直接抓取数据并导出 CSV  
   CLI mode: fetch data directly from command-line arguments and export CSV
+
+此外，项目还包含一个轻量级 agent 层，用于把自然语言任务解析成结构化执行计划。  
+In addition, the project includes a lightweight agent layer that parses natural-language tasks into structured execution plans.
+
+## Agent Layer
+
+为了让项目更像一个可讲述的智能工具，而不是单纯的数据抓取脚本，仓库中加入了一个简单的 `weather_agent.py`。  
+To make the project easier to present as an intelligent tool rather than only a data-retrieval script, the repository now includes a simple `weather_agent.py`.
+
+这个 agent 当前支持：  
+The agent currently supports:
+
+- 识别天气抓取任务 / Recognizing weather retrieval tasks
+- 从自然语言中提取 `latitude`、`longitude`、日期区间和温度单位  
+  Extracting `latitude`, `longitude`, date range, and temperature unit from natural language
+- 生成结构化任务计划 / Generating a structured task plan
+- 在 GUI 中自动执行天气抓取任务 / Executing retrieval tasks automatically in the GUI
+- 在 CLI 中通过 `--prompt` 触发天气抓取 / Triggering retrieval in the CLI through `--prompt`
+
+示例提示词：  
+Example prompt:
+
+```text
+Fetch weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius.
+```
 
 ## 图形界面 | Graphical Interface
 
@@ -93,12 +120,20 @@ Supported arguments:
 - `--unit`：温度单位，`C` 或 `K` / temperature unit, `C` or `K`
 - `--out`：输出 CSV 文件名 / output CSV filename
 - `--gui`：显式启动图形界面 / explicitly launch the GUI
+- `--prompt`：自然语言任务输入 / natural-language task input
 
 示例：  
 Example:
 
 ```bash
 python app.py --lat 32.0 --lon -84.0 --start 2015-01-01 --end 2015-12-31 --unit C --out weather.csv
+```
+
+也可以使用自然语言模式：  
+You can also use natural-language mode:
+
+```bash
+python app.py --prompt "Fetch weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius." --out weather.csv
 ```
 
 运行成功后，程序会输出类似：  
@@ -136,6 +171,7 @@ The tool standardizes NASA POWER output columns. Common output fields include:
 weather-tool/
 ├── app.py                 # Unified entry point for GUI and CLI
 ├── weather_app.py         # Streamlit UI and interaction logic
+├── weather_agent.py       # Lightweight agent plan builder
 ├── weather_core.py        # Data retrieval, normalization, and evaluation logic
 ├── requirements.txt       # Python dependencies
 ├── WeatherTool.spec       # PyInstaller config
@@ -202,6 +238,12 @@ After startup, the local `Streamlit` page will open in your browser.
 
 ```bash
 python app.py --lat 32.0 --lon -84.0 --start 2015-01-01 --end 2015-12-31 --unit C --out weather.csv
+```
+
+### 6. 使用 agent 提示词导出 CSV | Use the agent prompt to export CSV
+
+```bash
+python app.py --prompt "Fetch weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius." --out weather.csv
 ```
 
 ## CSV 输入格式说明 | CSV Input Format
@@ -304,6 +346,7 @@ The current `requirements.txt` also includes scientific-computing-related packag
 - 机器学习建模前的数据准备 / Data preparation for machine learning
 - 真实值与模型输出的可视化对比 / Visual comparison of ground truth and model outputs
 - 需要脚本化导出天气 CSV 的流程 / Workflows that need scripted CSV export
+- 简单的任务型 agent 演示项目 / A simple task-oriented agent demo project
 
 ## 后续可改进方向 | Possible Improvements
 
