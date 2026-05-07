@@ -1,7 +1,7 @@
-# Weather Tool
+# MeteoAgent
 
-一个同时支持 `Streamlit` 图形界面和命令行导出的天气数据工具，基于 **NASA POWER** 获取指定经纬度和时间范围的日尺度气象数据，并提供真实值与预测值 CSV 的误差分析功能。  
-A weather-data tool that supports both a `Streamlit` graphical interface and command-line CSV export. It uses **NASA POWER** to retrieve daily weather data for a given latitude/longitude and date range, and also provides error analysis for real vs predicted CSV files.
+一个面向任务的天气检索与分析 agent，支持 `Streamlit` 图形界面、命令行导出和轻量级自然语言任务执行。项目基于 **NASA POWER** 获取指定经纬度和时间范围的日尺度气象数据，并提供真实值与预测值 CSV 的误差分析与摘要洞察功能。  
+A task-oriented weather retrieval and analysis agent that supports a `Streamlit` graphical interface, command-line export, and lightweight natural-language task execution. It uses **NASA POWER** to retrieve daily weather data for a given latitude/longitude and date range, and provides real-vs-predicted CSV evaluation plus summary insights.
 
 仓库地址 / Repository: [dchen0212/weather-tool](https://github.com/dchen0212/weather-tool)
 
@@ -13,6 +13,8 @@ A weather-data tool that supports both a `Streamlit` graphical interface and com
   Support both graphical and command-line usage
 - 支持轻量级自然语言 weather agent，用于任务解析与自动执行  
   Support a lightweight natural-language weather agent for task parsing and execution
+- 支持天气摘要、关键指标洞察和下一步动作建议  
+  Support weather summaries, key metric insights, and next-action suggestions
 - 支持摄氏度与开尔文两种温度单位  
   Support both Celsius and Kelvin temperature units
 - 自动标准化常见天气字段名，便于建模或对比分析  
@@ -50,17 +52,20 @@ To make the project easier to present as an intelligent tool rather than only a 
 The agent currently supports:
 
 - 识别天气抓取任务 / Recognizing weather retrieval tasks
+- 识别天气摘要任务 / Recognizing weather summary tasks
 - 从自然语言中提取 `latitude`、`longitude`、日期区间和温度单位  
   Extracting `latitude`, `longitude`, date range, and temperature unit from natural language
 - 生成结构化任务计划 / Generating a structured task plan
+- 输出下一步动作建议 / Producing next-action suggestions
+- 生成关键变量摘要和 highlights / Generating variable summaries and highlights
 - 在 GUI 中自动执行天气抓取任务 / Executing retrieval tasks automatically in the GUI
-- 在 CLI 中通过 `--prompt` 触发天气抓取 / Triggering retrieval in the CLI through `--prompt`
+- 在 CLI 中通过 `--prompt` 触发天气抓取或摘要 / Triggering retrieval or summary in the CLI through `--prompt`
 
 示例提示词：  
 Example prompt:
 
 ```text
-Fetch weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius.
+Summarize the weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius.
 ```
 
 ## 图形界面 | Graphical Interface
@@ -133,7 +138,7 @@ python app.py --lat 32.0 --lon -84.0 --start 2015-01-01 --end 2015-12-31 --unit 
 You can also use natural-language mode:
 
 ```bash
-python app.py --prompt "Fetch weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius." --out weather.csv
+python app.py --prompt "Summarize the weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius." --out weather.csv
 ```
 
 运行成功后，程序会输出类似：  
@@ -174,7 +179,7 @@ weather-tool/
 ├── weather_agent.py       # Lightweight agent plan builder
 ├── weather_core.py        # Data retrieval, normalization, and evaluation logic
 ├── requirements.txt       # Python dependencies
-├── WeatherTool.spec       # PyInstaller config
+├── MeteoAgent.spec        # PyInstaller config
 ├── .github/workflows/
 │   └── windows-build.yml  # Windows EXE build workflow
 └── dist/                  # Build artifacts
@@ -287,7 +292,7 @@ The project uses the daily point-based API, which is suitable for weather analys
 
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --noconsole --name WeatherTool app.py \
+pyinstaller --onefile --noconsole --name MeteoAgent app.py \
   --collect-all streamlit \
   --copy-metadata streamlit \
   --collect-all altair \
@@ -298,14 +303,14 @@ pyinstaller --onefile --noconsole --name WeatherTool app.py \
 After packaging, the artifact is typically located at:
 
 ```text
-dist/WeatherTool
+dist/MeteoAgent
 ```
 
 在 Windows 工作流中，产物名称为：  
 In the Windows workflow, the output file is:
 
 ```text
-dist/WeatherTool.exe
+dist/MeteoAgent.exe
 ```
 
 ## GitHub Actions 自动构建 | GitHub Actions Build
@@ -317,7 +322,7 @@ The repository includes a Windows build workflow:
 - 触发方式 / Trigger: push to `main` or manual dispatch
 - 输出内容 / Outputs:
   - 源码压缩包 / Source archive
-  - Windows 可执行文件 `WeatherTool.exe` / Windows executable `WeatherTool.exe`
+  - Windows 可执行文件 `MeteoAgent.exe` / Windows executable `MeteoAgent.exe`
 
 如果你希望向非 Python 用户分发工具，这个流程会比较方便。  
 This is useful if you want to distribute the tool to users who do not have a Python environment.

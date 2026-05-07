@@ -1,7 +1,12 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from weather_agent import build_agent_plan, summarize_plan
+from weather_agent import (
+    build_agent_plan,
+    build_summary_highlights,
+    summarize_plan,
+    summarize_weather_frame,
+)
 from weather_core import get_weather_data  # 你原来的函数保留在 wt_data.py
 
 # 自动检测编码读取 CSV 文件
@@ -16,14 +21,15 @@ def read_csv_with_encoding_detection(uploaded_file):
     uploaded_file.seek(0)
     return df
 
-st.set_page_config(page_title="Weather data acquisition and analysis", layout="centered")
+st.set_page_config(page_title="MeteoAgent", layout="centered")
 
-st.title("🌤️ Weather data acquisition and analysis")
+st.title("🌦️ MeteoAgent")
+st.caption("Task-oriented weather retrieval and analysis agent powered by NASA POWER.")
 
 st.subheader("🤖 Weather Agent")
 agent_prompt = st.text_area(
     "Describe the task in plain language",
-    placeholder="Example: Fetch weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius.",
+    placeholder="Example: Summarize the weather for latitude 32 and longitude -84 from 2015-01-01 to 2015-12-31 in Celsius.",
     height=110,
 )
 
@@ -31,13 +37,25 @@ if st.button("Run Agent Plan"):
     plan = build_agent_plan(agent_prompt)
     st.markdown("**Agent Plan**")
     st.json(summarize_plan(plan))
+    if plan.next_actions:
+        st.markdown("**Next Actions**")
+        for action in plan.next_actions:
+            st.write(f"- {action}")
 
-    if plan.intent == "fetch_weather" and not plan.missing:
+    if plan.intent in {"fetch_weather", "summarize_weather"} and not plan.missing:
         with st.spinner("Agent is fetching weather data..."):
             try:
                 df = get_weather_data(plan.lat, plan.lon, plan.start_date, plan.end_date, unit=plan.unit)
                 st.success("✅ Agent completed the weather retrieval task.")
                 st.dataframe(df)
+                summary = summarize_weather_frame(df)
+                highlights = build_summary_highlights(summary)
+                if highlights:
+                    st.markdown("**Agent Highlights**")
+                    for line in highlights:
+                        st.write(f"- {line}")
+                with st.expander("Structured summary"):
+                    st.json(summary)
                 filename = f"agent_weather_{plan.start_date}_{plan.end_date}_{plan.lat}_{plan.lon}.csv"
                 csv = df.to_csv(index=False).encode("utf-8")
                 st.download_button("📥 Download Agent Result CSV", csv, file_name=filename, mime="text/csv")
@@ -45,10 +63,14 @@ if st.button("Run Agent Plan"):
                 st.error(f"❌ Agent failed: {e}")
     elif plan.intent == "compare_predictions":
         st.info("Upload the real and predicted CSV files below, then use the comparison section to finish the task.")
+        if plan.compare_field:
+            st.session_state["agent_compare_field"] = plan.compare_field
+            st.success(f"Agent suggested comparison field: {plan.compare_field}")
     else:
         st.warning("The agent needs more structured details before it can execute the task.")
 
 st.markdown("---")
+st.subheader("Manual Weather Retrieval")
 
 # --- Helper: parameter glossary ---
 def render_param_glossary():
@@ -172,7 +194,11 @@ if real_file and pred_file:
         if not compare_fields:
             st.error("❌ No common fields found for comparison")
         else:
-            target_col = st.selectbox("Select field to compare:", compare_fields)
+            default_index = 0
+            suggested_field = st.session_state.get("agent_compare_field")
+            if suggested_field in compare_fields:
+                default_index = compare_fields.index(suggested_field)
+            target_col = st.selectbox("Select field to compare:", compare_fields, index=default_index)
             if target_col.lower() == "date":
                 st.warning("⚠️ The 'date' field is a time field; no error metrics or plots will be generated.")
             else:

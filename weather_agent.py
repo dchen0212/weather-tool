@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+import pandas as pd
+
 
 DEFAULT_COMPARE_FIELD_CANDIDATES = [
     "t_avg",
@@ -23,6 +25,7 @@ class AgentPlan:
     compare_field: str | None = None
     missing: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    next_actions: list[str] = field(default_factory=list)
     raw_prompt: str = ""
 
 
@@ -51,15 +54,38 @@ def _detect_compare_field(text: str) -> str | None:
     return None
 
 
+def _build_next_actions(intent: str) -> list[str]:
+    if intent == "compare_predictions":
+        return [
+            "Upload the real and predicted CSV files.",
+            "Pick a shared numeric field for evaluation.",
+            "Review MAE, RMSE, R², and interval-level errors.",
+        ]
+    if intent == "summarize_weather":
+        return [
+            "Fetch the requested NASA POWER weather data.",
+            "Generate a compact summary of major variables.",
+            "Review the summary and export the CSV if needed.",
+        ]
+    return [
+        "Fetch the requested NASA POWER weather data.",
+        "Review the returned table and summary.",
+        "Export CSV or continue with comparison analysis.",
+    ]
+
+
 def build_agent_plan(prompt: str) -> AgentPlan:
     cleaned = prompt.strip()
     lowered = cleaned.lower()
 
     compare_keywords = ["compare", "comparison", "预测", "对比", "误差", "mae", "rmse", "r2"]
+    summarize_keywords = ["summarize", "summary", "insight", "report", "概括", "总结", "分析天气趋势"]
     fetch_keywords = ["fetch", "get", "download", "weather", "天气", "nasa", "power"]
 
     if any(keyword in lowered for keyword in compare_keywords):
         intent = "compare_predictions"
+    elif any(keyword in lowered for keyword in summarize_keywords):
+        intent = "summarize_weather"
     elif any(keyword in lowered for keyword in fetch_keywords):
         intent = "fetch_weather"
     else:
@@ -77,10 +103,11 @@ def build_agent_plan(prompt: str) -> AgentPlan:
         end_date=dates[1] if len(dates) >= 2 else None,
         unit=_detect_unit(cleaned),
         compare_field=_detect_compare_field(cleaned),
+        next_actions=_build_next_actions(intent),
         raw_prompt=cleaned,
     )
 
-    if intent == "fetch_weather":
+    if intent in {"fetch_weather", "summarize_weather"}:
         if plan.lat is None:
             plan.missing.append("latitude")
         if plan.lon is None:
@@ -91,6 +118,8 @@ def build_agent_plan(prompt: str) -> AgentPlan:
             plan.missing.append("end_date")
         if not plan.missing:
             plan.notes.append("Ready to fetch NASA POWER weather data.")
+            if intent == "summarize_weather":
+                plan.notes.append("A summary report will be generated after retrieval.")
     elif intent == "compare_predictions":
         if plan.compare_field is None:
             plan.notes.append("No explicit comparison field found; the UI can fall back to a shared numeric column.")
@@ -110,4 +139,62 @@ def summarize_plan(plan: AgentPlan) -> dict[str, Any]:
         "compare_field": plan.compare_field,
         "missing": plan.missing,
         "notes": plan.notes,
+        "next_actions": plan.next_actions,
     }
+
+
+def summarize_weather_frame(df: pd.DataFrame) -> dict[str, Any]:
+    summary: dict[str, Any] = {"rows": len(df), "columns": list(df.columns)}
+
+    if "date" in df.columns and not df.empty:
+        summary["date_range"] = {
+            "start": str(df["date"].iloc[0]),
+            "end": str(df["date"].iloc[-1]),
+        }
+
+    numeric_candidates = [
+        "t_avg",
+        "t_max",
+        "t_min",
+        "precip",
+        "solar_rad",
+        "rel_humidity",
+        "wind_speed_10m",
+    ]
+
+    variable_summary: dict[str, Any] = {}
+    for column in numeric_candidates:
+        if column in df.columns:
+            values = pd.to_numeric(df[column], errors="coerce").dropna()
+            if values.empty:
+                continue
+            variable_summary[column] = {
+                "mean": round(float(values.mean()), 3),
+                "min": round(float(values.min()), 3),
+                "max": round(float(values.max()), 3),
+            }
+    summary["variables"] = variable_summary
+    return summary
+
+
+def build_summary_highlights(summary: dict[str, Any]) -> list[str]:
+    highlights: list[str] = []
+    date_range = summary.get("date_range")
+    if date_range:
+        highlights.append(f"Covers {summary.get('rows', 0)} daily records from {date_range['start']} to {date_range['end']}.")
+
+    variables = summary.get("variables", {})
+    if "t_avg" in variables:
+        highlights.append(
+            f"Average daily temperature is {variables['t_avg']['mean']} in the selected unit."
+        )
+    if "precip" in variables:
+        highlights.append(
+            f"Daily precipitation ranges from {variables['precip']['min']} to {variables['precip']['max']}."
+        )
+    if "solar_rad" in variables:
+        highlights.append(
+            f"Solar radiation has a mean of {variables['solar_rad']['mean']}."
+        )
+
+    return highlights

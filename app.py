@@ -12,13 +12,14 @@ def launch_streamlit():
 def run_cli(args):
     import pandas as pd
 
-    from weather_agent import build_agent_plan
+    from weather_agent import build_agent_plan, build_summary_highlights, summarize_weather_frame
     from weather_core import get_weather_data, standardize_weather_columns
 
+    show_summary = False
     if args.prompt:
         plan = build_agent_plan(args.prompt)
-        if plan.intent != "fetch_weather":
-            raise SystemExit("Prompt mode in CLI currently supports weather retrieval requests only.")
+        if plan.intent not in {"fetch_weather", "summarize_weather"}:
+            raise SystemExit("Prompt mode in CLI currently supports retrieval and summary requests only.")
         if plan.missing:
             raise SystemExit(f"Prompt is missing required fields: {', '.join(plan.missing)}")
         args.lat = plan.lat
@@ -26,6 +27,7 @@ def run_cli(args):
         args.start = plan.start_date
         args.end = plan.end_date
         args.unit = plan.unit
+        show_summary = plan.intent == "summarize_weather"
 
     df = get_weather_data(args.lat, args.lon, args.start, args.end, args.unit)
     if df is None or df.empty:
@@ -38,10 +40,17 @@ def run_cli(args):
     df.to_csv(args.out, index=False)
     print(f"Saved: {args.out}  rows={len(df)}")
 
+    if show_summary:
+        summary = summarize_weather_frame(df)
+        highlights = build_summary_highlights(summary)
+        print("Agent summary:")
+        for line in highlights:
+            print(f"- {line}")
+
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Weather Tool: launch the Streamlit UI or fetch NASA POWER weather data as CSV."
+        description="MeteoAgent: launch the agent UI or fetch NASA POWER weather data as CSV."
     )
     parser.add_argument("--gui", action="store_true", help="Launch the Streamlit interface explicitly.")
     parser.add_argument("--lat", type=float, help="Latitude")
