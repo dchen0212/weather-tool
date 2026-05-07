@@ -340,9 +340,6 @@ Main dependencies include:
 - `numpy`
 - `chardet`
 
-当前 `requirements.txt` 中还包含 `netCDF4`、`xarray`、`h5netcdf`、`h5py` 等科学计算相关依赖，后续如果不再使用，可按实际需求精简。  
-The current `requirements.txt` also includes scientific-computing-related packages such as `netCDF4`, `xarray`, `h5netcdf`, and `h5py`. These can be trimmed later if they are not needed.
-
 ## 适用场景 | Use Cases
 
 - 气象数据采集 / Weather data collection
@@ -352,18 +349,4 @@ The current `requirements.txt` also includes scientific-computing-related packag
 - 真实值与模型输出的可视化对比 / Visual comparison of ground truth and model outputs
 - 需要脚本化导出天气 CSV 的流程 / Workflows that need scripted CSV export
 - 简单的任务型 agent 演示项目 / A simple task-oriented agent demo project
-
-## 后续可改进方向 | Possible Improvements
-
-- 增加更多天气数据源作为备用接口 / Add more weather data sources as fallbacks
-- 支持批量地点查询 / Support batch location queries
-- 增加地图选点功能 / Add map-based location selection
-- 增加更多评估指标，如 `MAPE` / Add more evaluation metrics such as `MAPE`
-- 支持结果图表一键导出 / Support one-click export of result charts
-- 支持时间序列对齐与缺失值处理 / Add time-series alignment and missing-value handling
-- 将 CLI 与 GUI 进一步模块化拆分 / Further modularize the CLI and GUI
-
-## License
-
-如果你准备开源发布，建议补充一个明确的许可证文件，例如 `MIT License`。  
-If you plan to publish this as an open-source project, it is recommended to add a clear license file, such as the `MIT License`.
+  
