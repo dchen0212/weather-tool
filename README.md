@@ -1,38 +1,49 @@
-[README.md](https://github.com/user-attachments/files/27474469/README.md)
 # Weather Tool
 
-一个基于 `Streamlit` 的天气数据获取与分析工具，支持从 **NASA POWER** 拉取指定经纬度和时间范围的日尺度气象数据，并对真实值与预测值 CSV 进行误差评估与可视化分析。  
-A `Streamlit`-based weather data acquisition and analysis tool. It supports fetching daily weather data for a given latitude/longitude and date range from **NASA POWER**, and provides error analysis and visualization for real vs predicted CSV files.
+一个同时支持 `Streamlit` 图形界面和命令行导出的天气数据工具，基于 **NASA POWER** 获取指定经纬度和时间范围的日尺度气象数据，并提供真实值与预测值 CSV 的误差分析功能。  
+A weather-data tool that supports both a `Streamlit` graphical interface and command-line CSV export. It uses **NASA POWER** to retrieve daily weather data for a given latitude/longitude and date range, and also provides error analysis for real vs predicted CSV files.
 
 仓库地址 / Repository: [dchen0212/weather-tool](https://github.com/dchen0212/weather-tool)
 
 ## 功能简介 | Features
 
-- 根据经纬度和日期范围获取天气数据  
-  Fetch weather data by latitude, longitude, and date range
+- 根据经纬度和日期范围抓取日尺度天气数据  
+  Fetch daily weather data by latitude, longitude, and date range
+- 支持图形界面与命令行两种使用方式  
+  Support both graphical and command-line usage
 - 支持摄氏度与开尔文两种温度单位  
   Support both Celsius and Kelvin temperature units
 - 自动标准化常见天气字段名，便于建模或对比分析  
   Automatically standardize common weather field names for modeling or comparison
+- 支持导出抓取到的天气数据 CSV  
+  Export fetched weather data as CSV
 - 支持上传真实值 CSV 与预测值 CSV 进行误差分析  
   Upload real and predicted CSV files for error analysis
 - 自动计算 `MAE`、`RMSE`、`R²`  
   Automatically calculate `MAE`, `RMSE`, and `R²`
 - 支持按周、双周、月三个时间尺度查看误差变化  
   View error trends at weekly, biweekly, and monthly scales
-- 生成真实值/预测值折线图、误差曲线图和分段指标图  
-  Generate actual-vs-predicted charts, error curves, and interval metric plots
-- 支持导出抓取到的天气数据 CSV  
-  Export fetched weather data as CSV
 - 提供 GitHub Actions 工作流，可自动构建 Windows 可执行文件  
   Includes a GitHub Actions workflow for building a Windows executable
 
-## 界面能力 | What The App Does
+## 使用方式 | Usage Modes
 
-应用主要分为两部分。  
-The application is mainly divided into two parts.
+这个项目现在有两个入口模式：  
+This project now has two usage modes:
 
-### 1. 天气数据获取 | Weather Data Retrieval
+- GUI 模式：启动 `Streamlit` 页面进行交互式操作  
+  GUI mode: launch the `Streamlit` interface for interactive use
+- CLI 模式：通过命令行参数直接抓取数据并导出 CSV  
+  CLI mode: fetch data directly from command-line arguments and export CSV
+
+## 图形界面 | Graphical Interface
+
+图形界面适合交互式查看数据和做真实值/预测值对比分析。  
+The graphical interface is suitable for interactive data exploration and real-vs-predicted comparison analysis.
+
+### 界面能力 | What The GUI Does
+
+#### 1. 天气数据获取 | Weather Data Retrieval
 
 用户输入：  
 User inputs:
@@ -46,27 +57,7 @@ User inputs:
 应用会调用 NASA POWER API 获取日尺度天气数据，并返回标准化后的表格结果。  
 The app calls the NASA POWER API to retrieve daily weather data and returns a standardized table.
 
-当前主要输出字段包括：  
-Current main output fields include:
-
-- `date`
-- `t_max`
-- `t_min`
-- `t_avg`
-- `t_range`
-- `precip`
-- `solar_rad`
-- `clrsky_solar_rad`
-- `toa_solar_rad`
-- `rel_humidity`
-- `spec_humidity`
-- `wind_speed_10m`
-- `wind_speed_50m`
-- `wind_direction_10m`
-- `surface_pressure`
-- `unit`
-
-### 2. 真实值 vs 预测值对比分析 | Real vs Predicted Comparison
+#### 2. 真实值 vs 预测值对比分析 | Real vs Predicted Comparison
 
 用户可上传两份 CSV：  
 Users can upload two CSV files:
@@ -87,12 +78,64 @@ The app automatically identifies shared fields between the two files and lets us
 - 绝对误差与原始误差曲线 / Absolute error and raw error curves
 - 真实值与预测值折线图 / Actual vs predicted line chart
 
+## 命令行模式 | Command-Line Mode
+
+当你给 `app.py` 传入坐标和日期参数时，它会以命令行模式运行，直接生成天气数据 CSV。  
+When you pass coordinates and date arguments to `app.py`, it runs in command-line mode and generates a weather-data CSV directly.
+
+支持参数：  
+Supported arguments:
+
+- `--lat`：纬度 / latitude
+- `--lon`：经度 / longitude
+- `--start`：开始日期，格式 `YYYY-MM-DD` / start date in `YYYY-MM-DD`
+- `--end`：结束日期，格式 `YYYY-MM-DD` / end date in `YYYY-MM-DD`
+- `--unit`：温度单位，`C` 或 `K` / temperature unit, `C` or `K`
+- `--out`：输出 CSV 文件名 / output CSV filename
+- `--gui`：显式启动图形界面 / explicitly launch the GUI
+
+示例：  
+Example:
+
+```bash
+python app.py --lat 32.0 --lon -84.0 --start 2015-01-01 --end 2015-12-31 --unit C --out weather.csv
+```
+
+运行成功后，程序会输出类似：  
+On success, the program prints something like:
+
+```text
+Saved: weather.csv  rows=365
+```
+
+## 输出字段 | Output Fields
+
+程序会对 NASA POWER 返回列进行标准化，常见输出字段包括：  
+The tool standardizes NASA POWER output columns. Common output fields include:
+
+- `date`
+- `t_max`
+- `t_min`
+- `t_avg`
+- `t_range`
+- `precip`
+- `solar_rad`
+- `clrsky_solar_rad`
+- `toa_solar_rad`
+- `rel_humidity`
+- `spec_humidity`
+- `wind_speed_10m`
+- `wind_speed_50m`
+- `wind_direction_10m`
+- `surface_pressure`
+- `unit`
+
 ## 项目结构 | Project Structure
 
 ```text
 weather-tool/
-├── app.py                 # Streamlit launcher
-├── weather_app.py         # UI and interaction logic
+├── app.py                 # Unified entry point for GUI and CLI
+├── weather_app.py         # Streamlit UI and interaction logic
 ├── weather_core.py        # Data retrieval, normalization, and evaluation logic
 ├── requirements.txt       # Python dependencies
 ├── WeatherTool.spec       # PyInstaller config
@@ -132,27 +175,39 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 4. 启动应用 | Start the app
+### 4. 启动图形界面 | Launch the GUI
 
 方式一 / Option 1:
-
-```bash
-streamlit run weather_app.py
-```
-
-方式二 / Option 2:
 
 ```bash
 python app.py
 ```
 
+方式二 / Option 2:
+
+```bash
+python app.py --gui
+```
+
+方式三 / Option 3:
+
+```bash
+streamlit run weather_app.py
+```
+
 默认启动后可在浏览器访问本地 `Streamlit` 页面。  
 After startup, the local `Streamlit` page will open in your browser.
 
+### 5. 使用命令行导出 CSV | Use the CLI to export CSV
+
+```bash
+python app.py --lat 32.0 --lon -84.0 --start 2015-01-01 --end 2015-12-31 --unit C --out weather.csv
+```
+
 ## CSV 输入格式说明 | CSV Input Format
 
-用于对比分析的 CSV 建议满足以下要求：  
-For comparison analysis, CSV files are recommended to follow these rules:
+用于图形界面对比分析的 CSV 建议满足以下要求：  
+For GUI-based comparison analysis, CSV files are recommended to follow these rules:
 
 - 第一行为表头  
   The first row should be the header
@@ -248,6 +303,7 @@ The current `requirements.txt` also includes scientific-computing-related packag
 - 农业或环境相关数据分析 / Agricultural or environmental data analysis
 - 机器学习建模前的数据准备 / Data preparation for machine learning
 - 真实值与模型输出的可视化对比 / Visual comparison of ground truth and model outputs
+- 需要脚本化导出天气 CSV 的流程 / Workflows that need scripted CSV export
 
 ## 后续可改进方向 | Possible Improvements
 
@@ -257,6 +313,7 @@ The current `requirements.txt` also includes scientific-computing-related packag
 - 增加更多评估指标，如 `MAPE` / Add more evaluation metrics such as `MAPE`
 - 支持结果图表一键导出 / Support one-click export of result charts
 - 支持时间序列对齐与缺失值处理 / Add time-series alignment and missing-value handling
+- 将 CLI 与 GUI 进一步模块化拆分 / Further modularize the CLI and GUI
 
 ## License
 
